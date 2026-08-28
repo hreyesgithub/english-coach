@@ -259,7 +259,11 @@ class SuppressDisconnectMiddleware(BaseHTTPMiddleware):
 app.add_middleware(SuppressDisconnectMiddleware)
 
 # --- INSTANCIAS DE SERVICIOS ---
-lt = LanguageTool("en-US")
+# Si está en Render usa la API pública externa, si estás en local usa el servidor interno
+if os.environ.get("RENDER"):
+    lt = LanguageTool("en-US", remote_server="https://languagetool.org")
+else:
+    lt = LanguageTool("en-US")
 
 
 # --- FUNCIONES AUXILIARES ---

@@ -2,7 +2,8 @@
 // LinguaBoost Pro - Frontend Application Engine (v4.5 High Contrast)
 // ==========================================
 
-const API_BASE_URL = "http://127.0.0.1:8000";
+const API_BASE_URL = "http://127.0.0.1:8000"; // Para pruebas locales
+//const API_BASE_URL = "http://127.0.0.1:8000"; // Para pruebas en Render
 
 // Estado global
 let curriculumData = {};
@@ -677,6 +678,20 @@ async function fetchIPAMatrix() {
     } catch (err) { console.error("Error IPA:", err); }
 }
 
+// Mapa de color por tipo de fonema — evita repetir clases y mantiene
+// consistencia visual entre vocales, diptongos y consonantes.
+const IPA_TYPE_COLORS = {
+    "Long Vowel": "bg-cyan-100 text-cyan-800 dark:bg-cyan-900/50 dark:text-cyan-300",
+    "Short Vowel": "bg-sky-100 text-sky-800 dark:bg-sky-900/50 dark:text-sky-300",
+    "Schwa": "bg-slate-200 text-slate-700 dark:bg-slate-700 dark:text-slate-300",
+    "Diphthong": "bg-purple-100 text-purple-800 dark:bg-purple-900/50 dark:text-purple-300",
+    "Voiced": "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/50 dark:text-emerald-300",
+    "Unvoiced": "bg-amber-100 text-amber-800 dark:bg-amber-900/50 dark:text-amber-300",
+    "Nasal": "bg-rose-100 text-rose-800 dark:bg-rose-900/50 dark:text-rose-300",
+    "Approximant": "bg-indigo-100 text-indigo-800 dark:bg-indigo-900/50 dark:text-indigo-300",
+};
+const IPA_TYPE_DEFAULT_COLOR = "bg-slate-100 text-slate-700 dark:bg-slate-700 dark:text-slate-300";
+
 function renderPhonemeCategory(containerId, items) {
   const grid = document.getElementById(containerId);
   if (!grid) return;
@@ -684,8 +699,10 @@ function renderPhonemeCategory(containerId, items) {
   grid.innerHTML = items.map((item, index) => {
     // Recortar textos largos para la vista previa
     const truncate = (str, max) => str.length > max ? str.slice(0, max) + '…' : str;
-    const shortHint = truncate(item.spanish_equivalent_or_hack, 70);
-    const shortError = truncate(item.common_error_spanish, 60);
+    const shortHint = truncate(item.spanish_equivalent_or_hack, 300);
+    const shortError = truncate(item.common_error_spanish, 300);
+
+    const typeColor = IPA_TYPE_COLORS[item.type] || IPA_TYPE_DEFAULT_COLOR;
 
     return `
       <div class="phoneme-card group bg-white dark:bg-slate-800 rounded-2xl shadow-sm hover:shadow-lg border border-slate-200 dark:border-slate-700 hover:border-cyan-400 dark:hover:border-cyan-500 transition-all duration-200 p-4 cursor-pointer"
@@ -700,7 +717,7 @@ function renderPhonemeCategory(containerId, items) {
         </div>
 
         <!-- Tipo -->
-        <div class="mt-1 text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider items-center text-center">${item.type}</div>
+        <div class="mt-1 text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider ">${item.type}</div>
 
         <!-- Common spellings (badges) -->
         <div class="mt-3 flex flex-wrap gap-1.5">
@@ -740,8 +757,8 @@ function renderPhonemeCategory(containerId, items) {
         <!-- Contenedor de detalles ocultos (se expande) -->
         <div id="details-${index}" class="hidden mt-3 pt-3 border-t border-slate-200 dark:border-slate-700 text-xs text-slate-600 dark:text-slate-300 space-y-2">
           <div>
-            <i class="fa-solid fa-magnifying-glass text-slate-500 dark:text-slate-400 text-xs w-4"></i>
-            <span class="font-semibold">Truco completo:</span> ${item.spanish_equivalent_or_hack}
+            <i class="fa-regular fa-lightbulb text-amber-400 dark:text-amber-300 text-xs mr-1.5"></i>
+            <span class="font-semibold">Similar a:</span> ${item.spanish_equivalent_or_hack}
           </div>
           <div>
             <i class="fa-solid fa-xmark text-rose-500 dark:text-rose-400 text-xs w-4"></i>
