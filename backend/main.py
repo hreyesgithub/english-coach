@@ -14,6 +14,7 @@ import os
 import re
 import sqlite3
 import tempfile
+import httpx
 from pathlib import Path
 from datetime import date, datetime, timedelta
 from typing import List, Optional
@@ -24,7 +25,8 @@ from dotenv import load_dotenv
 from fastapi import FastAPI, File, Form, HTTPException, Query, Request, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, StreamingResponse
-from language_tool_python import LanguageTool  # type: ignore[import-not-found]
+
+# from language_tool_python import LanguageTool  # type: ignore[import-not-found]
 from openai import OpenAI
 from openai.types.chat import ChatCompletionMessageParam
 import google.generativeai as genai
@@ -58,10 +60,12 @@ if not openai_client:
 
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 if GEMINI_API_KEY:
-    genai.configure(api_key=GEMINI_API_KEY) # type:ignore
+    genai.configure(api_key=GEMINI_API_KEY)  # type: ignore
     logger.info("Gemini configurado correctamente.")
 else:
-    logger.warning("GEMINI_API_KEY no configurada: el Roleplay usará respuestas de respaldo.")
+    logger.warning(
+        "GEMINI_API_KEY no configurada: el Roleplay usará respuestas de respaldo."
+    )
 
 # --- BASE DE DATOS SQLITE PARA REPETICIÓN ESPACIADA (SRS) ---
 DB_NAME = "srs_bank.db"
@@ -150,6 +154,7 @@ SRS_INTERVALS = {
 # --- CURRÍCULO COMPLETO BASADO EN EL MCER (A1-C2) — ver content/curriculum.json ---
 CURRICULUM = load_content("curriculum.json")
 
+
 def seed_srs_from_curriculum():
     """
     Sincroniza el vocabulario de CURRICULUM con el banco SRS (srs_words).
@@ -195,7 +200,9 @@ def seed_srs_from_curriculum():
     conn.commit()
     conn.close()
     if inserted:
-        logger.info("Seed SRS: %d palabra(s) nueva(s) añadida(s) desde CURRICULUM.", inserted)
+        logger.info(
+            "Seed SRS: %d palabra(s) nueva(s) añadida(s) desde CURRICULUM.", inserted
+        )
 
 
 seed_srs_from_curriculum()
@@ -253,33 +260,12 @@ class SuppressDisconnectMiddleware(BaseHTTPMiddleware):
             return await call_next(request)
         except ClientDisconnected:
             print(f"ℹ️ Cliente desconectado prematuramente en: {request.url.path}")
-            return JSONResponse(status_code=499, content={"detail": "Client Closed Request"})
+            return JSONResponse(
+                status_code=499, content={"detail": "Client Closed Request"}
+            )
 
 
 app.add_middleware(SuppressDisconnectMiddleware)
-
-# --- INSTANCIA DE LANGUAGETOOL ---
-#
-# En producción/Render usamos el servidor remoto para evitar depender
-# de Java en el entorno de ejecución.
-#
-# En local puedes usar el servidor Java si tienes Java instalado.
-
-USE_REMOTE_LANGUAGETOOL = os.getenv("USE_REMOTE_LANGUAGETOOL", "").lower() in {
-    "1",
-    "true",
-    "yes",
-}
-
-if USE_REMOTE_LANGUAGETOOL:
-    logger.info("LanguageTool: usando servidor remoto.")
-    lt = LanguageTool(
-        "en-US",
-        remote_server="https://api.languagetool.org/",
-    )
-else:
-    logger.info("LanguageTool: usando servidor local.")
-    lt = LanguageTool("en-US")
 
 
 # --- FUNCIONES AUXILIARES ---
@@ -632,9 +618,7 @@ async def roleplay_respond(data: RoleplayMessageRequest, request: Request):
     history = list(data.conversation_history)
     last = history[-1] if history else None
     if not (
-        last
-        and last.get("role") == "user"
-        and last.get("content") == data.user_message
+        last and last.get("role") == "user" and last.get("content") == data.user_message
     ):
         history.append({"role": "user", "content": data.user_message})
 
@@ -646,7 +630,7 @@ async def roleplay_respond(data: RoleplayMessageRequest, request: Request):
             gemini_history = []
             # El system_prompt se coloca como primer mensaje de usuario
             gemini_history.append({"role": "user", "parts": [system_prompt]})
-            
+
             # Añadir el historial conversacional (excluyendo el último mensaje de usuario si ya está duplicado)
             # Nota: history ya contiene los mensajes previos (sin duplicar el último)
             for msg in history:
@@ -655,9 +639,9 @@ async def roleplay_respond(data: RoleplayMessageRequest, request: Request):
                 gemini_history.append({"role": role, "parts": [msg.get("content", "")]})
 
             # Iniciar sesión de chat con el historial completo
-            model = genai.GenerativeModel('gemini-3.6-flash') # type:ignore
+            model = genai.GenerativeModel("gemini-3.6-flash")  # type: ignore
             chat = model.start_chat(history=gemini_history)
-            
+
             # Enviar el mensaje del usuario (ya está en history como último, pero lo enviamos de nuevo)
             # Para evitar duplicados, usamos el mensaje del usuario actual sin añadirlo al historial de la sesión
             # Si ya lo incluimos en history, podemos usar send_message con el mismo texto.
@@ -782,7 +766,9 @@ def next_placement_question(data: PlacementStepRequest):
             logger.warning(
                 "Banco de preguntas de placement agotado en niveles '%s'/'%s' "
                 "tras %d preguntas; se repetirá una pregunta ya vista.",
-                next_level, curr_level, len(updated_history),
+                next_level,
+                curr_level,
+                len(updated_history),
             )
             next_level = curr_level
             available_qs = PLACEMENT_QUESTIONS[next_level]
@@ -805,34 +791,67 @@ def next_placement_question(data: PlacementStepRequest):
 
 # --- ENDPOINT WRITING CHECK ---
 @app.post("/api/check-writing")
-def check_writing(data: WritingCheckRequest):
+async def check_writing(data: WritingCheckRequest):
+    """
+    Comprueba gramática y ortografía usando la API HTTP pública
+    de LanguageTool.
+
+    No requiere Java ni language_tool_python.
+    """
+
+    if not data.text.strip():
+        return {
+            "feedback": [],
+            "score": 100,
+        }
+
+    if len(data.text) > 20000:
+        raise HTTPException(
+            status_code=400,
+            detail="El texto no puede superar los 20.000 caracteres.",
+        )
+
     try:
-        matches = lt.check(data.text)
+        async with httpx.AsyncClient(timeout=20.0) as client:
+            response = await client.post(
+                "https://api.languagetool.org/v2/check",
+                data={
+                    "text": data.text,
+                    "language": "en-US",
+                },
+            )
+
+        response.raise_for_status()
+
+        result = response.json()
+        matches = result.get("matches", [])
 
         feedback = []
 
         for match in matches:
-            msg = (
-                getattr(match, "message", None)
-                or getattr(match, "msg", None)
-                or getattr(match, "shortMessage", None)
-                or getattr(match, "short_message", None)
-                or str(match)
+            message = match.get("message", "")
+            short_message = match.get("shortMessage", "")
+
+            replacements = [
+                replacement.get("value", "")
+                for replacement in match.get("replacements", [])[:3]
+                if replacement.get("value")
+            ]
+
+            feedback.append(
+                {
+                    "message": message,
+                    "short_message": (
+                        short_message
+                        or (
+                            message[:50] + "..."
+                            if len(message) > 50
+                            else message
+                        )
+                    ),
+                    "replacements": replacements,
+                }
             )
-
-            short_msg = msg[:50] + "..." if len(msg) > 50 else msg
-
-            replacements = (
-                match.replacements[:3]
-                if match.replacements
-                else []
-            )
-
-            feedback.append({
-                "message": msg,
-                "short_message": short_msg,
-                "replacements": replacements,
-            })
 
         score = max(0, 100 - len(matches) * 5)
 
@@ -841,12 +860,33 @@ def check_writing(data: WritingCheckRequest):
             "score": score,
         }
 
-    except Exception as e:
-        logger.exception("Error consultando LanguageTool")
+    except httpx.TimeoutException:
+        logger.warning("Timeout consultando LanguageTool.")
+
+        raise HTTPException(
+            status_code=504,
+            detail="LanguageTool tardó demasiado en responder.",
+        )
+
+    except httpx.HTTPStatusError as e:
+        logger.error(
+            "LanguageTool respondió con HTTP %s.",
+            e.response.status_code,
+        )
 
         raise HTTPException(
             status_code=503,
-            detail="El corrector gramatical no está disponible temporalmente.",
+            detail="El servicio de corrección gramatical no está disponible.",
+        )
+
+    except Exception:
+        logger.exception(
+            "Error inesperado consultando LanguageTool."
+        )
+
+        raise HTTPException(
+            status_code=503,
+            detail="No se pudo realizar la corrección gramatical.",
         )
 
 
@@ -894,7 +934,7 @@ def get_daily_challenge():
 @app.post("/api/daily-challenge/complete")
 def complete_challenge(
     mission_id: int = Query(..., description="ID de la misión"),
-    user_id: str = Query("default", description="ID del usuario")
+    user_id: str = Query("default", description="ID del usuario"),
 ):
     xp_reward = 15
     stats = update_user_xp(user_id, xp_reward)
