@@ -261,8 +261,13 @@ app.add_middleware(SuppressDisconnectMiddleware)
 # --- INSTANCIAS DE SERVICIOS ---
 # Si está en Render usa la API pública externa, si estás en local usa el servidor interno
 if os.environ.get("RENDER"):
-    lt = LanguageTool("en-US", remote_server="https://languagetool.org")
+    # Engañamos a la librería configurando una ruta ficticia para el ejecutable de Java
+    os.environ["JAVA_HOME"] = "/usr"
+    
+    # Inicializamos usando estrictamente el servidor en la nube sin descargar nada local
+    lt = LanguageTool("en-US", remote_server="https://api.languagetool.org/")
 else:
+    # Configuración normal para tu computadora local (donde sí tienes Java)
     lt = LanguageTool("en-US")
 
 
