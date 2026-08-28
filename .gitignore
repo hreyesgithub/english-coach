@@ -1,0 +1,8 @@
+readme/
+node_modules/
+test/
+venv/
+.venv/
+__pycache__/
+*.py[cod]
+.vscode/

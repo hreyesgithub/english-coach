@@ -1,0 +1,38 @@
+[
+    {
+        "id": "coffee_shop",
+        "title": "Ordering Coffee",
+        "icon": "fa-mug-hot",
+        "role": "Barista",
+        "description": "Estás en una cafetería en Londres y deseas ordenar tu bebida y un snack.",
+        "initial_message": "Hello! Welcome to Costa Coffee. What can I get started for you today?",
+        "suggested_replies": [
+            "Hi! I would like a medium cappuccino, please.",
+            "Hello, do you have any oat milk available?"
+        ]
+    },
+    {
+        "id": "job_interview",
+        "title": "Tech Job Interview",
+        "icon": "fa-briefcase",
+        "role": "Interviewer",
+        "description": "Una entrevista inicial para un puesto de desarrollo de software.",
+        "initial_message": "Good morning! Thanks for coming in. To start, could you briefly introduce yourself and your background?",
+        "suggested_replies": [
+            "Good morning! Sure, I am a software engineer with experience in Web & Backend APIs.",
+            "Hi! I've been working as a developer managing databases and automation scripts."
+        ]
+    },
+    {
+        "id": "airport_checkin",
+        "title": "Airport Check-In",
+        "icon": "fa-plane-departure",
+        "role": "Agent",
+        "description": "Estás frente al mostrador de facturación antes de tu vuelo internacional.",
+        "initial_message": "Good afternoon! May I please see your passport and flight booking confirmation?",
+        "suggested_replies": [
+            "Here is my passport and ticket confirmation.",
+            "Sure! Can I check two bags for this flight?"
+        ]
+    }
+]

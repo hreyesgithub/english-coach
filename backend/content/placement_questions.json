@@ -1,0 +1,290 @@
+{
+    "A1": [
+        {
+            "id": "a1_1",
+            "level": "A1",
+            "question": "Choose the correct sentence:",
+            "options": [
+                "She don't like tea.",
+                "She doesn't likes tea.",
+                "She doesn't like tea.",
+                "She not like tea."
+            ],
+            "correct": 2
+        },
+        {
+            "id": "a1_2",
+            "level": "A1",
+            "question": "Complete with the correct word: 'Where _____ you yesterday?'",
+            "options": ["was", "were", "are", "did"],
+            "correct": 1
+        },
+        {
+            "id": "a1_3",
+            "level": "A1",
+            "question": "My sister and I _____ from Canada.",
+            "options": ["am", "is", "are", "be"],
+            "correct": 2
+        },
+        {
+            "id": "a1_4",
+            "level": "A1",
+            "question": "Complete the sentence: 'I have _____ apple and _____ banana.'",
+            "options": ["a / a", "an / a", "a / an", "an / an"],
+            "correct": 1
+        }
+    ],
+    "A2": [
+        {
+            "id": "a2_1",
+            "level": "A2",
+            "question": "Complete the sentence: 'If it rains tomorrow, we _____ the football match.'",
+            "options": ["canceled", "will cancel", "would cancel", "canceling"],
+            "correct": 1
+        },
+        {
+            "id": "a2_2",
+            "level": "A2",
+            "question": "Select the correct past form: 'While I _____ dinner, the phone rang.'",
+            "options": ["am cooking", "cooked", "was cooking", "have cooked"],
+            "correct": 2
+        },
+        {
+            "id": "a2_3",
+            "level": "A2",
+            "question": "I haven't seen her _____ last summer.",
+            "options": ["for", "since", "in", "at"],
+            "correct": 1
+        },
+        {
+            "id": "a2_4",
+            "level": "A2",
+            "question": "If I _____ you, I would apologize.",
+            "options": ["am", "was", "were", "had been"],
+            "correct": 2
+        }
+    ],
+    "B1": [
+        {
+            "id": "b1_1",
+            "level": "B1",
+            "question": "Which option fits best? 'I wish I _____ more time to travel when I was younger.'",
+            "options": ["had had", "have had", "would have", "had"],
+            "correct": 0
+        },
+        {
+            "id": "b1_2",
+            "level": "B1",
+            "question": "Choose the correct passive voice: 'The new bridge _____ by the end of next year.'",
+            "options": [
+                "will build",
+                "will be built",
+                "is building",
+                "has built"
+            ],
+            "correct": 1
+        },
+        {
+            "id": "b1_3",
+            "level": "B1",
+            "question": "I _____ this author's novels for years, and I still love them.",
+            "options": ["read", "have read", "am reading", "was reading"],
+            "correct": 1
+        },
+        {
+            "id": "b1_4",
+            "level": "B1",
+            "question": "Complete the sentence: 'She is _____ than her sister.'",
+            "options": ["more tall", "taller", "tallest", "most tall"],
+            "correct": 1
+        }
+    ],
+    "B2": [
+        {
+            "id": "b2_1",
+            "level": "B2",
+            "question": "Identify the correct structure: 'Hardly _____ entered the room when the lights went out.'",
+            "options": ["I had", "had I", "did I", "I did"],
+            "correct": 1
+        },
+        {
+            "id": "b2_2",
+            "level": "B2",
+            "question": "Select the most appropriate word: 'The CEO's decision was heavily _____ by market volatility.'",
+            "options": ["influenced", "inflicted", "interfered", "injected"],
+            "correct": 0
+        },
+        {
+            "id": "b2_3",
+            "level": "B2",
+            "question": "The government’s policies have led to the ______ of the problem.",
+            "options": [
+                "exacerbation",
+                "exaggeration",
+                "examination",
+                "execution"
+            ],
+            "correct": 0
+        },
+        {
+            "id": "b2_4",
+            "level": "B2",
+            "question": "By the time the auditors finish, the finance team ______ the new reporting system for six months.",
+            "options": [
+                "will implement",
+                "will have implemented",
+                "will be implementing",
+                "implement"
+            ],
+            "correct": 1
+        },
+        {
+            "id": "b2_5",
+            "level": "B2",
+            "question": "Select the most appropriate word: 'The CEO's decision was heavily _____ by market volatility.'",
+            "options": ["influenced", "inflicted", "interfered", "injected"],
+            "correct": 0
+        }
+    ],
+    "C1": [
+        {
+            "id": "c1_1",
+            "level": "C1",
+            "question": "Not only _____ the deadline, but he also exceeded every target set for him.",
+            "options": ["he met", "did he meet", "he did meet", "met he"],
+            "correct": 1
+        },
+        {
+            "id": "c1_2",
+            "level": "C1",
+            "question": "Complete the sentence: '_____ the reporter announced the road closure, did I realise how bad the accident had been.'",
+            "options": ["While", "Only when", "Not only", "As soon as"],
+            "correct": 1
+        },
+        {
+            "id": "c1_3",
+            "level": "C1",
+            "question": "Choose the correct option: 'The issue of extended shopping hours ______ discussed in government, so we’ve no clear guidance yet.'",
+            "options": [
+                "will have been",
+                "has already been",
+                "is still being",
+                "was being"
+            ],
+            "correct": 2
+        },
+        {
+            "id": "c1_4",
+            "level": "C1",
+            "question": "Select the best word: 'Exercise is ___ believed to be one of the best forms of stress management.'",
+            "options": ["instantly", "exclusively", "widely", "hardly"],
+            "correct": 2
+        },
+        {
+            "id": "c1_5",
+            "level": "C1",
+            "question": "The company had to apologise ______ consumers on the safety of their product range.",
+            "options": [
+                "that they mislead",
+                "for misleading",
+                "to mislead",
+                "about misleading"
+            ],
+            "correct": 1
+        },
+        {
+            "id": "c1_6",
+            "level": "C1",
+            "question": "Complete the sentence: 'If Lucy had wanted to be wealthy, she ____ become an accountant, not a nurse.'",
+            "options": ["would", "would have", "will", "had"],
+            "correct": 1
+        },
+        {
+            "id": "c1_7",
+            "level": "C1",
+            "question": "Select the word that best fits: 'His argument, _____ persuasive on the surface, ultimately relied on a flawed premise.'",
+            "options": ["despite", "although", "albeit", "however"],
+            "correct": 2
+        },
+        {
+            "id": "c1_8",
+            "level": "C1",
+            "question": "Choose the correct inversion: 'Not only _____ late, but she also forgot the documents.'",
+            "options": ["she was", "was she", "she did", "did she"],
+            "correct": 1
+        }
+    ],
+    "C2": [
+        {
+            "id": "c2_1",
+            "level": "C2",
+            "question": "The committee’s report was a masterpiece of ___, saying nothing of substance.",
+            "options": [
+                "circumlocution",
+                "eloquence",
+                "precision",
+                "forthrightness"
+            ],
+            "correct": 0
+        },
+        {
+            "id": "c2_2",
+            "level": "C2",
+            "question": "You can exercise your _____________ to cancel the contract immediately, but you wouldn't receive any money at that point.",
+            "options": ["duty", "obligation", "right", "possibility"],
+            "correct": 2
+        },
+        {
+            "id": "c2_3",
+            "level": "C2",
+            "question": "The sales practices of this company will have to be totally _____________ if we are to save it.",
+            "options": ["overthrown", "overhauled", "overrun", "overwhelmed"],
+            "correct": 1
+        },
+        {
+            "id": "c2_4",
+            "level": "C2",
+            "question": "I don't think anyone understood what I was saying at the meeting. I totally failed to get my point _____________.",
+            "options": ["around", "about", "across", "along"],
+            "correct": 2
+        },
+        {
+            "id": "c2_5",
+            "level": "C2",
+            "question": "We weren't _____________ of the danger we were in until it was too late.",
+            "options": ["alive", "alert", "awake", "aware"],
+            "correct": 3
+        },
+        {
+            "id": "c2_6",
+            "level": "C2",
+            "question": "The government announced today that they intend to _____________ the rise of crime in the inner cities.",
+            "options": ["beat", "win", "retaliate", "counter"],
+            "correct": 3
+        },
+        {
+            "id": "c2_7",
+            "level": "C2",
+            "question": "Choose the most natural way to soften a criticism in a professional email:",
+            "options": [
+                "I think this is wrong.",
+                "This is completely incorrect.",
+                "I wonder if we might reconsider this approach.",
+                "You are mistaken."
+            ],
+            "correct": 2
+        },
+        {
+            "id": "c2_8",
+            "level": "C2",
+            "question": "Select the best replacement for the underlined idiom: 'The negotiations reached a stalemate.'",
+            "options": [
+                "a compromise",
+                "a deadlock",
+                "a conclusion",
+                "a breakthrough"
+            ],
+            "correct": 1
+        }
+    ]
+}

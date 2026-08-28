@@ -1,0 +1,338 @@
+{
+  "A1": {
+    "level_name": "A1 - Acceso (Principiante)",
+    "units": [
+      {
+        "id": "a1-u1",
+        "title": "Unidad 1: Presentaciones y Rutinas",
+        "grammar_focus": "Verb To Be, Subject Pronouns & Present Simple",
+        "vocabulary": [
+          "Name",
+          "Country",
+          "Family",
+          "Morning",
+          "Breakfast",
+          "Work",
+          "Coffee",
+          "Routine"
+        ],
+        "text": "Hello! My name is Sarah, and I am from England. My country is small, but it is beautiful. I live with my family near Manchester. Every morning, I wake up at seven o'clock and eat breakfast with my sister. Then I drink coffee and check my messages before I go to work. I usually walk to work because my office is near my home. My days are busy, but I like my routine.",
+        "listening_prompt": "Where does Sarah work, and how does she usually get there?"
+      },
+      {
+        "id": "a1-u2",
+        "title": "Unidad 2: Mi Casa y Mi Mundo",
+        "grammar_focus": "There Is / There Are, Have Got & Prepositions of Place",
+        "vocabulary": [
+          "House",
+          "Kitchen",
+          "Bedroom",
+          "Living room",
+          "Window",
+          "Table",
+          "Chair",
+          "Garden"
+        ],
+        "text": "I live in a small house with my brother. There are two bedrooms and there is a bright kitchen next to the living room. We have got a comfortable sofa, a big table, and four chairs. There are some plants near the window, and we also have a small garden behind the house. My favorite place is the garden because I can relax there in the evening.",
+        "listening_prompt": "Where are the plants in the apartment?"
+      },
+      {
+        "id": "a1-u3",
+        "title": "Unidad 3: Tiempo Libre y Pequeñas Aventuras",
+        "grammar_focus": "Can / Can't, Adverbs of Frequency & Like + -ing",
+        "vocabulary": [
+          "Hobby",
+          "Music",
+          "Movie",
+          "Dance",
+          "Read",
+          "Cook",
+          "Play",
+          "Weekend"
+        ],
+        "text": "My favorite hobby is listening to music and watching funny movies. At the weekend, I also like to read short stories in English. I can cook simple pasta, but I can't make complicated dishes. My sister loves to dance, and we sometimes go to a small music club near our house. On Sundays, we usually stay home and play board games.",
+        "listening_prompt": "What can the speaker cook?"
+      }
+    ]
+  },
+  "A2": {
+    "level_name": "A2 - Plataforma (Elemental)",
+    "units": [
+      {
+        "id": "a2-u1",
+        "title": "Unidad 1: Viajes y Experiencias Pasadas",
+        "grammar_focus": "Past Simple, Regular & Irregular Verbs and Time Expressions",
+        "vocabulary": [
+          "Flight",
+          "Airport",
+          "Luggage",
+          "Destination",
+          "Ticket",
+          "Museum",
+          "Journey",
+          "Souvenir"
+        ],
+        "text": "Last summer, Lucas took his first flight to London, and his final destination was a small hotel near the city center. At the airport, he almost lost his luggage, but a friendly employee found it quickly. During his journey, he visited several historical museums and walked along the Thames River. One afternoon, he lost his train ticket, but the same employee helped him again. Before going home, Lucas bought a small red bus souvenir for his sister.",
+        "listening_prompt": "What problem did Lucas have during his trip?"
+      },
+      {
+        "id": "a2-u2",
+        "title": "Unidad 2: Planes, Sueños y Próximos Pasos",
+        "grammar_focus": "Be Going To, Will & Present Continuous for Future Arrangements",
+        "vocabulary": [
+          "Plan",
+          "Trip",
+          "Holiday",
+          "Reservation",
+          "Future",
+          "Goal",
+          "Weekend",
+          "Appointment"
+        ],
+        "text": "Emma has a clear plan for her next holiday. Next month, she is going to visit her cousin in Dublin, and this trip is part of a bigger goal: to see more of Europe in the future. She has already made a hotel reservation, and they are meeting at the airport on Friday. Before she leaves, Emma has one last appointment at the dentist this weekend. She hopes the trip will be an exciting new experience.",
+        "listening_prompt": "Where is Emma going next month?"
+      },
+      {
+        "id": "a2-u3",
+        "title": "Unidad 3: Historias Cotidianas y Nuevas Experiencias",
+        "grammar_focus": "Past Continuous, When / While & Basic Linking Words",
+        "vocabulary": [
+          "Suddenly",
+          "Luckily",
+          "Accident",
+          "Rain",
+          "Street",
+          "Phone",
+          "Neighbor",
+          "Umbrella"
+        ],
+        "text": "Yesterday, I was walking home along a quiet street while it was raining heavily. I was talking to my friend on the phone when my umbrella suddenly broke. I almost had an accident when I slipped near a wet corner, but luckily, my neighbor was driving past and stopped to help me. We laughed about the situation and continued talking about our weekend plans.",
+        "listening_prompt": "What happened to the speaker's umbrella?"
+      }
+    ]
+  },
+  "B1": {
+    "level_name": "B1 - Intermedio",
+    "units": [
+      {
+        "id": "b1-u1",
+        "title": "Unidad 1: Tecnología y Cómo Está Cambiando Nuestra Vida",
+        "grammar_focus": "Present Perfect vs Past Simple, Already / Yet / Just",
+        "vocabulary": [
+          "Innovation",
+          "Artificial Intelligence",
+          "Development",
+          "Device",
+          "Digital",
+          "Convenient",
+          "Challenge",
+          "Skill"
+        ],
+        "text": "Technology has transformed the way we learn languages, largely thanks to constant innovation in mobile applications. Many students now use a digital device powered by artificial intelligence to practice vocabulary and pronunciation, which is very convenient for busy schedules. However, this development has not replaced human communication. Last year, I joined an online language course, and the biggest challenge was staying motivated. I discovered that regular practice was more important than any advanced skill with technology.",
+        "listening_prompt": "What has technology changed about language learning?"
+      },
+      {
+        "id": "b1-u2",
+        "title": "Unidad 2: Trabajo, Habilidades y Experiencias Profesionales",
+        "grammar_focus": "Passive Voice, Relative Clauses & Modals of Obligation",
+        "vocabulary": [
+          "Career",
+          "Deadline",
+          "Employee",
+          "Manager",
+          "Responsibility",
+          "Experience",
+          "Meeting",
+          "Promotion"
+        ],
+        "text": "In many modern companies, every employee is encouraged to develop new skills throughout their career. Important projects are usually managed by small teams, and deadlines must be respected. Last year, I worked on a project that required excellent communication, and my manager gave me more responsibility during our weekly meeting. That experience taught me that technical knowledge is useful, but teamwork is equally important — and it eventually helped me earn a promotion.",
+        "listening_prompt": "What did the speaker learn from the project?"
+      },
+      {
+        "id": "b1-u3",
+        "title": "Unidad 3: Opiniones, Decisiones y Experiencias Vividas",
+        "grammar_focus": "First & Second Conditionals, Reported Speech & Opinion Structures",
+        "vocabulary": [
+          "Opinion",
+          "Evidence",
+          "Decision",
+          "Advantage",
+          "Disadvantage",
+          "Suggest",
+          "Agree",
+          "Reliable"
+        ],
+        "text": "People often have different opinions about remote work, and there isn't much solid evidence to prove which option is best. Some employees say that working from home is a clear advantage because it saves time and improves concentration, while others believe that offices reduce the disadvantage of feeling isolated and create better opportunities for collaboration. Experts suggest that companies should offer flexible options so employees can make their own decision. Most people agree that a reliable internet connection is essential either way. In my opinion, the best solution depends on the type of work.",
+        "listening_prompt": "What advantage of remote work does the speaker mention?"
+      }
+    ]
+  },
+  "B2": {
+    "level_name": "B2 - Intermedio Alto",
+    "units": [
+      {
+        "id": "b2-u1",
+        "title": "Unidad 1: Hipótesis y Decisiones Difíciles",
+        "grammar_focus": "Second & Third Conditionals, Mixed Conditionals & Modal Verbs",
+        "vocabulary": [
+          "Perspective",
+          "Hypothesis",
+          "Consequence",
+          "Substantial",
+          "Risk",
+          "Trade-off",
+          "Constraint",
+          "Outcome"
+        ],
+        "text": "From an economic perspective, one hypothesis is that companies could achieve substantial environmental benefits without sacrificing economic progress, if certain constraints were removed. Had governments invested earlier in efficient public transport, many cities might already have lower levels of pollution, with less risk to public health. Such decisions involve difficult trade-offs, because every policy creates both benefits and unintended consequences, and the final outcome is never fully predictable.",
+        "listening_prompt": "What might have happened if governments had invested earlier in public transport?"
+      },
+      {
+        "id": "b2-u2",
+        "title": "Unidad 2: Debates, Cultura y Perspectivas Contrarias",
+        "grammar_focus": "Advanced Modal Verbs of Deduction, Concession & Complex Linking Devices",
+        "vocabulary": [
+          "Controversial",
+          "Assumption",
+          "Consensus",
+          "Nevertheless",
+          "Evidence",
+          "Bias",
+          "Cultural",
+          "Interpretation"
+        ],
+        "text": "A cultural tradition that seems unusual — or even controversial — to outsiders may have a perfectly logical historical explanation. The practice might have originated from a practical necessity rather than a symbolic intention, though this is only an assumption without solid evidence. Nevertheless, modern observers may interpret it differently, and there is rarely a clear consensus. Personal bias often shapes this interpretation more than people realize. A responsible discussion should therefore consider historical context before judging a tradition according to contemporary standards.",
+        "listening_prompt": "Why should people consider historical context when discussing cultural traditions?"
+      },
+      {
+        "id": "b2-u3",
+        "title": "Unidad 3: Resolver Problemas Bajo Presión",
+        "grammar_focus": "Passive Reporting Structures, Modals of Deduction & Advanced Gerund/Infinitive Patterns",
+        "vocabulary": [
+          "Troubleshooting",
+          "Failure",
+          "Root Cause",
+          "Mitigate",
+          "Approach",
+          "Priority",
+          "Feasible",
+          "Implement"
+        ],
+        "text": "Effective troubleshooting starts with a simple principle: when a complex system fails, the most visible problem is not always the real cause. A technical failure may have been triggered by a much earlier decision. The team must therefore identify the root cause before choosing an approach to mitigate the damage. Fixing the root cause should always be the top priority, even if a quick, feasible workaround seems tempting. Otherwise, the team might implement a temporary fix while a more serious failure develops somewhere else.",
+        "listening_prompt": "Why is identifying the root cause important?"
+      }
+    ]
+  },
+  "C1": {
+    "level_name": "C1 - Avanzado",
+    "units": [
+      {
+        "id": "c1-u1",
+        "title": "Unidad 1: Pensamiento Crítico y Argumentación Sofisticada",
+        "grammar_focus": "Inversion for Emphasis, Advanced Conditionals, Subjunctive Structures & Sophisticated Discourse Markers",
+        "vocabulary": [
+          "Nuance",
+          "Premise",
+          "Implication",
+          "Coherent",
+          "Albeit",
+          "Notwithstanding",
+          "Arguably",
+          "Underlying"
+        ],
+        "text": "Rarely has public debate been so heavily influenced by information that is both abundant and difficult to evaluate, often losing the nuance that complex issues deserve. Notwithstanding the apparent accessibility of knowledge, individuals may struggle to distinguish reliable evidence from persuasive rhetoric, frequently accepting a flawed premise without questioning its implication. Albeit useful, technology cannot substitute for critical judgment, and is arguably making the problem worse. Were citizens to examine the underlying assumptions of an argument more carefully and build a more coherent view, public discourse might become considerably more constructive.",
+        "listening_prompt": "Why does the speaker argue that access to information does not guarantee critical understanding?"
+      },
+      {
+        "id": "c1-u2",
+        "title": "Unidad 2: Lenguaje Profesional, Ironía y Matices",
+        "grammar_focus": "Advanced Hedging, Inversion, Emphatic Structures, Modal Perfects & Complex Relative Clauses",
+        "vocabulary": [
+          "Subtle",
+          "Understatement",
+          "Sarcasm",
+          "Diplomatic",
+          "Counterproductive",
+          "Ambiguous",
+          "Presumably",
+          "Condescending"
+        ],
+        "text": "In professional communication, saying exactly what you mean is not always the same as communicating effectively; a subtle understatement can sometimes say more than blunt words. A manager who says that a proposal is 'rather ambitious' may, depending on the context, be expressing genuine enthusiasm, gentle sarcasm, or a diplomatic way of suggesting that the proposal is unrealistic. Had the comment been interpreted literally, the team might have missed its intended criticism, and reacting defensively would have been counterproductive. Such an ambiguous remark is presumably intentional; it can serve as a sophisticated alternative to a blunt, almost condescending correction.",
+        "listening_prompt": "Why might the phrase 'rather ambitious' have more than one interpretation?"
+      },
+      {
+        "id": "c1-u3",
+        "title": "Unidad 3: Textos Académicos y Problemas Complejos",
+        "grammar_focus": "Nominalisation, Cleft Sentences, Advanced Passive Constructions, Concessive Clauses & Complex Hypotheticals",
+        "vocabulary": [
+          "Paradigm",
+          "Framework",
+          "Methodology",
+          "Empirical",
+          "Nevertheless",
+          "Consequently",
+          "Constraint",
+          "Sustainable"
+        ],
+        "text": "What is often overlooked in discussions about innovation is the institutional framework in which new ideas are developed, and the underlying paradigm that shapes how organizations think. Although technological progress can accelerate change, it does not automatically guarantee meaningful or sustainable improvement, especially without a rigorous methodology grounded in empirical data. Nevertheless, it is the interaction between technology, human behavior, regulation, and economic incentives — operating within real institutional constraints — that ultimately determines whether an innovation produces lasting benefits. Consequently, simplistic solutions to complex problems are unlikely to remain effective for long.",
+        "listening_prompt": "According to the text, what determines whether an innovation produces lasting benefits?"
+      }
+    ]
+  },
+  "C2": {
+    "level_name": "C2 - Maestría / Competencia Perfecta",
+    "units": [
+      {
+        "id": "c2-u1",
+        "title": "Unidad 1: Filosofía, Ciencia y Límites del Conocimiento",
+        "grammar_focus": "Complex Cleft Sentences, Mixed Conditionals, Inversion, Ellipsis & Advanced Emphasis",
+        "vocabulary": [
+          "Epistemology",
+          "Paradigm",
+          "Premise",
+          "Fallacy",
+          "Contingency",
+          "Ambivalence",
+          "Inherent",
+          "Conundrum"
+        ],
+        "text": "What remains profoundly difficult to establish, from the standpoint of epistemology, is not whether knowledge has expanded, but whether our capacity to interpret that knowledge has kept pace with it. This question rests on a deceptively simple premise, and treating it as a straightforward fallacy of mere fact-accumulation would ignore a real contingency: every scientific paradigm eventually confronts evidence it cannot fully explain. Such intellectual ambivalence is arguably inherent to the pursuit of knowledge itself. It is precisely this conundrum that makes scientific inquiry both intellectually demanding and endlessly compelling.",
+        "listening_prompt": "What paradox about scientific progress does the speaker describe?"
+      },
+      {
+        "id": "c2-u2",
+        "title": "Unidad 2: Geopolítica, Poder y Significados Implícitos",
+        "grammar_focus": "Advanced Modal Perfects, Inversion, Reduced Clauses, Concessive Structures & Pragmatic Meaning",
+        "vocabulary": [
+          "Geopolitical",
+          "Leverage",
+          "Diplomatic",
+          "Retaliation",
+          "Sovereignty",
+          "Interdependence",
+          "Precedent",
+          "Ambiguity"
+        ],
+        "text": "Rarely is geopolitical language as neutral as it appears. A government may describe a military operation as a 'security measure' and use it as leverage in later negotiations, while its counterpart characterises the same event as an act of aggression that threatens its sovereignty and demands retaliation. Neither formulation is necessarily accidental, and each risks setting a dangerous precedent for future disputes. Given the economic interdependence between many nations, political actors frame the event carefully, thereby influencing how audiences interpret responsibility, legitimacy, and proportionality. Had diplomatic statements been stripped of such strategic ambiguity, negotiations might actually become more transparent—but perhaps less flexible.",
+        "listening_prompt": "How can the choice of political language influence the interpretation of an event?"
+      },
+      {
+        "id": "c2-u3",
+        "title": "Unidad 3: Lenguaje, Ironía y Dobles Sentidos",
+        "grammar_focus": "Advanced Phrasal Verbs, Idiomatic Constructions, Cleft Sentences, Ellipsis, Emphasis & Complex Mixed Structures",
+        "vocabulary": [
+          "Subtext",
+          "Irony",
+          "Witty",
+          "Ambiguous",
+          "Connotation",
+          "Deadpan",
+          "Obscure",
+          "Double Entendre"
+        ],
+        "text": "Language becomes particularly fascinating when the subtext diverges from what is literally said. A witty speaker might remark, in a perfectly deadpan tone, that a disastrous presentation was 'an absolute triumph'. The literal meaning is positive; the intended meaning, thanks to the negative connotation the audience picks up on, is precisely the opposite — sometimes it even works as a clever double entendre. It is the surrounding context, tone, shared knowledge, and cultural expectations that allow listeners to decode the irony, even when the reference itself is fairly obscure. Without those pragmatic signals, even a highly proficient speaker could easily miss an ambiguous joke like this one.",
+        "listening_prompt": "What allows listeners to understand that the speaker is being ironic?"
+      }
+    ]
+  }
+}

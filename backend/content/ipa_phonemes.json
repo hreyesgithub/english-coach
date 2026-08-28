@@ -1,0 +1,451 @@
+{
+    "vowels": [
+        {
+            "symbol": "iː",
+            "example": "sheep",
+            "type": "Long Vowel",
+            "ipa_ex": "/ʃiːp/",
+            "common_spellings": ["ee", "ea", "e_e"],
+            "minimal_pairs": ["ship vs sheep", "sit vs seat"],
+            "spanish_equivalent_or_hack": "Similar a la 'i' española, pero más larga y tensa. Sonríe ligeramente y mantén la 'i' sin cambiar la posición de la boca.",
+            "common_error_spanish": "Hacerla demasiado corta o relajarla hasta /ɪ/."
+        },
+        {
+            "symbol": "ɪ",
+            "example": "ship",
+            "type": "Short Vowel",
+            "ipa_ex": "/ʃɪp/",
+            "common_spellings": ["i", "y"],
+            "minimal_pairs": ["ship vs sheep", "sit vs seat"],
+            "spanish_equivalent_or_hack": "No existe exactamente en español. Haz una 'i' corta y relajada, con menos tensión y ligeramente más atrás que la 'i' española.",
+            "common_error_spanish": "Pronunciarla como una 'i' española tensa o convertirla en /iː/."
+        },
+        {
+            "symbol": "ʊ",
+            "example": "good",
+            "type": "Short Vowel",
+            "ipa_ex": "/ɡʊd/",
+            "common_spellings": ["oo", "u"],
+            "minimal_pairs": ["good vs food", "pull vs pool"],
+            "spanish_equivalent_or_hack": "No existe exactamente en español. Haz una 'u' corta y relajada; redondea los labios, pero menos que para /uː/.",
+            "common_error_spanish": "Pronunciar una 'u' española demasiado tensa o alargarla hasta /uː/."
+        },
+        {
+            "symbol": "uː",
+            "example": "shoot",
+            "type": "Long Vowel",
+            "ipa_ex": "/ʃuːt/",
+            "common_spellings": ["oo", "u_e", "ue"],
+            "minimal_pairs": ["shoot vs shot", "pool vs pull"],
+            "spanish_equivalent_or_hack": "Similar a la 'u' española, pero más larga y tensa. Redondea y adelanta los labios y mantén el sonido.",
+            "common_error_spanish": "Hacerla demasiado corta o relajada, confundiendo /uː/ con /ʊ/."
+        },
+        {
+            "symbol": "e",
+            "example": "bed",
+            "type": "Short Vowel",
+            "ipa_ex": "/bed/",
+            "common_spellings": ["e", "ea"],
+            "minimal_pairs": ["bed vs bad", "pen vs pan"],
+            "spanish_equivalent_or_hack": "Se parece a la 'e' española, pero es más breve y algo más abierta. Di una 'e' relajada, sin alargarla.",
+            "common_error_spanish": "Cerrar demasiado la vocal o confundirla con /æ/ o /eɪ/."
+        },
+        {
+            "symbol": "ə",
+            "example": "teacher",
+            "type": "Schwa",
+            "ipa_ex": "/ˈtiː.tʃər/",
+            "common_spellings": ["a", "e", "o", "u"],
+            "minimal_pairs": [
+                "the (débil) vs thee (fuerte)",
+                "a (débil) vs eight (fuerte)"
+            ],
+            "spanish_equivalent_or_hack": "No existe en español como vocal reducida. Relaja completamente la boca y produce una vocal muy corta y neutra, sin buscar una 'a', 'e' u otra vocal clara.",
+            "common_error_spanish": "Pronunciar una vocal española completa donde el inglés la reduce a schwa."
+        },
+        {
+            "symbol": "ɜː",
+            "example": "bird",
+            "type": "Long Vowel",
+            "ipa_ex": "/bɜːd/",
+            "common_spellings": ["ir", "er", "ur"],
+            "minimal_pairs": ["bird vs beard", "fur vs far"],
+            "spanish_equivalent_or_hack": "No existe en español. Mantén una vocal central, relajada y larga, sin redondear demasiado los labios. No hagas vibrar la 'r'.",
+            "common_error_spanish": "Convertirla en una 'e' u 'o' española o añadir una 'r' vibrante."
+        },
+        {
+            "symbol": "ɔː",
+            "example": "door",
+            "type": "Long Vowel",
+            "ipa_ex": "/dɔːr/",
+            "common_spellings": ["or", "aw", "au", "ore"],
+            "minimal_pairs": ["door vs dare", "caught vs cut"],
+            "spanish_equivalent_or_hack": "No tiene un equivalente exacto. Haz una 'o' más abierta y larga, con los labios redondeados pero relajados.",
+            "common_error_spanish": "Pronunciar una 'o' española demasiado cerrada o demasiado breve."
+        },
+        {
+            "symbol": "æ",
+            "example": "cat",
+            "type": "Short Vowel",
+            "ipa_ex": "/kæt/",
+            "common_spellings": ["a"],
+            "minimal_pairs": ["cat vs cut", "bat vs bet"],
+            "spanish_equivalent_or_hack": "No existe en español. Abre bastante la boca y lleva la lengua hacia delante; suena aproximadamente entre 'a' y 'e'.",
+            "common_error_spanish": "Pronunciar una 'a' española demasiado central o sustituirla por /e/."
+        },
+        {
+            "symbol": "ʌ",
+            "example": "cup",
+            "type": "Short Vowel",
+            "ipa_ex": "/kʌp/",
+            "common_spellings": ["u", "o", "ou"],
+            "minimal_pairs": ["cup vs cop", "cut vs caught"],
+            "spanish_equivalent_or_hack": "No existe exactamente en español. Haz una vocal corta y relajada en el centro de la boca, parecida a una 'a' pero menos abierta.",
+            "common_error_spanish": "Pronunciarla como una 'a' española plena o confundirla con /ɒ/."
+        },
+        {
+            "symbol": "ɑː",
+            "example": "far",
+            "type": "Long Vowel",
+            "ipa_ex": "/fɑːr/",
+            "common_spellings": ["ar"],
+            "minimal_pairs": ["far vs fur", "car vs cur"],
+            "spanish_equivalent_or_hack": "Parecida a una 'a' española, pero más profunda y larga. Baja la mandíbula y mantén la lengua hacia atrás.",
+            "common_error_spanish": "Hacerla demasiado frontal o demasiado corta."
+        },
+        {
+            "symbol": "ɒ",
+            "example": "on",
+            "type": "Short Vowel",
+            "ipa_ex": "/ɒn/",
+            "common_spellings": ["o"],
+            "minimal_pairs": ["on vs own", "not vs note"],
+            "spanish_equivalent_or_hack": "No existe exactamente en español. Haz una 'o' breve y abierta, con los labios ligeramente redondeados.",
+            "common_error_spanish": "Usar una 'o' española demasiado cerrada o confundirla con /ɔː/."
+        }
+    ],
+    "diphthongs": [
+        {
+            "symbol": "ɪə",
+            "example": "here",
+            "type": "Diphthong",
+            "ipa_ex": "/hɪər/",
+            "common_spellings": ["eer", "ere", "ear"],
+            "minimal_pairs": ["hear vs hair", "beer vs bear"],
+            "spanish_equivalent_or_hack": "No existe como diptongo propio en español. Empieza con una 'i' corta y deslízala hacia una vocal neutra, sin separar los dos sonidos.",
+            "common_error_spanish": "Pronunciar una 'r' española después de la vocal o confundirlo con /eə/."
+        },
+        {
+            "symbol": "eɪ",
+            "example": "wait",
+            "type": "Diphthong",
+            "ipa_ex": "/weɪt/",
+            "common_spellings": ["a_e", "ai", "ay"],
+            "minimal_pairs": ["wait vs wet", "bait vs bet"],
+            "spanish_equivalent_or_hack": "Similar a 'ei' en español, como en 'rey'. Empieza con una 'e' algo abierta y deslízala rápidamente hacia 'i'.",
+            "common_error_spanish": "Pronunciar una 'e' larga en lugar de un diptongo o hacer la primera parte demasiado cerrada."
+        },
+        {
+            "symbol": "ʊə",
+            "example": "tour",
+            "type": "Diphthong",
+            "ipa_ex": "/tʊər/",
+            "common_spellings": ["ure", "our"],
+            "minimal_pairs": ["tour vs tore", "poor vs pore"],
+            "spanish_equivalent_or_hack": "No existe en español. Empieza con una 'u' corta y relajada y deslízala hacia una vocal neutra.",
+            "common_error_spanish": "Añadir una 'r' vibrante o pronunciarlo como una sola vocal."
+        },
+        {
+            "symbol": "ɔɪ",
+            "example": "boy",
+            "type": "Diphthong",
+            "ipa_ex": "/bɔɪ/",
+            "common_spellings": ["oi", "oy"],
+            "minimal_pairs": ["boy vs bow", "toy vs toe"],
+            "spanish_equivalent_or_hack": "Parecido a 'oi' en español, como en 'soy'. Empieza con una 'o' abierta y deslízala rápidamente hacia 'i'.",
+            "common_error_spanish": "Hacer la 'o' demasiado cerrada o separar las dos vocales."
+        },
+        {
+            "symbol": "əʊ",
+            "example": "show",
+            "type": "Diphthong",
+            "ipa_ex": "/ʃəʊ/",
+            "common_spellings": ["o_e", "oa", "ow"],
+            "minimal_pairs": ["show vs shoe", "coat vs cot"],
+            "spanish_equivalent_or_hack": "No coincide exactamente con un diptongo español. Empieza con una vocal neutra y deslízala hacia una 'u' corta, redondeando los labios al final.",
+            "common_error_spanish": "Reducirlo a una 'o' simple o pronunciar un 'ou' demasiado marcado."
+        },
+        {
+            "symbol": "eə",
+            "example": "hair",
+            "type": "Diphthong",
+            "ipa_ex": "/heər/",
+            "common_spellings": ["air", "are", "ear"],
+            "minimal_pairs": ["hair vs here", "bear vs beer"],
+            "spanish_equivalent_or_hack": "No existe en español. Empieza con una 'e' abierta y deslízala hacia una vocal neutra, sin convertirla en una 'r' española.",
+            "common_error_spanish": "Pronunciar 'er' o confundirlo con /ɪə/."
+        },
+        {
+            "symbol": "aɪ",
+            "example": "my",
+            "type": "Diphthong",
+            "ipa_ex": "/maɪ/",
+            "common_spellings": ["i_e", "y", "igh", "ie"],
+            "minimal_pairs": ["my vs may", "night vs neat"],
+            "spanish_equivalent_or_hack": "Similar a 'ai' en español, como en 'aire'. Empieza con una 'a' abierta y deslízala hacia 'i'.",
+            "common_error_spanish": "Pronunciar una 'a' larga o cambiar el inicio hacia 'e'."
+        },
+        {
+            "symbol": "aʊ",
+            "example": "cow",
+            "type": "Diphthong",
+            "ipa_ex": "/kaʊ/",
+            "common_spellings": ["ou", "ow"],
+            "minimal_pairs": ["cow vs caw", "how vs haw"],
+            "spanish_equivalent_or_hack": "Similar a 'au' en español, como en 'causa'. Empieza con una 'a' abierta y deslízala hacia 'u', redondeando los labios al final.",
+            "common_error_spanish": "Hacerlo como 'ou' o mantener una 'a' demasiado larga."
+        }
+    ],
+    "consonants": [
+        {
+            "symbol": "p",
+            "example": "pea",
+            "type": "Unvoiced",
+            "ipa_ex": "/piː/",
+            "common_spellings": ["p", "pp"],
+            "minimal_pairs": ["pea vs bee", "pan vs ban"],
+            "spanish_equivalent_or_hack": "Como la 'p' española, pero al inicio de palabra suele salir un pequeño soplo de aire después de la consonante.",
+            "common_error_spanish": "Pronunciarla sin aspiración al inicio o acercarla demasiado a /b/."
+        },
+        {
+            "symbol": "b",
+            "example": "boat",
+            "type": "Voiced",
+            "ipa_ex": "/bəʊt/",
+            "common_spellings": ["b", "bb"],
+            "minimal_pairs": ["boat vs coat", "bee vs pea"],
+            "spanish_equivalent_or_hack": "Como la 'b' española, pero mantén un cierre completo de los labios también entre vocales.",
+            "common_error_spanish": "Suavizarla entre vocales hasta parecer /β/."
+        },
+        {
+            "symbol": "t",
+            "example": "tea",
+            "type": "Unvoiced",
+            "ipa_ex": "/tiː/",
+            "common_spellings": ["t", "tt"],
+            "minimal_pairs": ["tea vs bee", "ten vs den"],
+            "spanish_equivalent_or_hack": "Coloca la punta de la lengua justo detrás de los dientes superiores y deja salir un pequeño soplo al inicio de palabra.",
+            "common_error_spanish": "Colocar la lengua contra los dientes como en la 't' dental española o quitar la aspiración inicial."
+        },
+        {
+            "symbol": "d",
+            "example": "dog",
+            "type": "Voiced",
+            "ipa_ex": "/dɒɡ/",
+            "common_spellings": ["d", "dd"],
+            "minimal_pairs": ["dog vs dock", "day vs they"],
+            "spanish_equivalent_or_hack": "Coloca la punta de la lengua detrás de los dientes superiores y haz un cierre breve, con voz.",
+            "common_error_spanish": "Debilitarla entre vocales o hacerla demasiado dental."
+        },
+        {
+            "symbol": "tʃ",
+            "example": "cheese",
+            "type": "Unvoiced",
+            "ipa_ex": "/tʃiːz/",
+            "common_spellings": ["ch", "tch"],
+            "minimal_pairs": ["cheese vs she's", "chin vs shin"],
+            "spanish_equivalent_or_hack": "Muy parecida a la 'ch' española. Haz primero una pequeña oclusión y después deja pasar el aire como en /ʃ/.",
+            "common_error_spanish": "Reducirla a /ʃ/ o separarla en dos sonidos excesivamente marcados."
+        },
+        {
+            "symbol": "dʒ",
+            "example": "June",
+            "type": "Voiced",
+            "ipa_ex": "/dʒuːn/",
+            "common_spellings": ["j", "g", "dge"],
+            "minimal_pairs": ["joke vs choke", "gin vs chin"],
+            "spanish_equivalent_or_hack": "Es la versión sonora de /tʃ/. Haz una pequeña oclusión seguida de /ʒ/ y mantén la voz.",
+            "common_error_spanish": "Pronunciarla como 'y' pura o convertirla en /ʃ/."
+        },
+        {
+            "symbol": "k",
+            "example": "car",
+            "type": "Unvoiced",
+            "ipa_ex": "/kɑːr/",
+            "common_spellings": ["c", "k", "ck"],
+            "minimal_pairs": ["car vs bar", "coat vs goat"],
+            "spanish_equivalent_or_hack": "Como la 'c' de 'casa'. Al inicio de palabra, añade un pequeño soplo de aire después de /k/.",
+            "common_error_spanish": "Pronunciarla sin aspiración inicial o confundirla con /ɡ/."
+        },
+        {
+            "symbol": "ɡ",
+            "example": "go",
+            "type": "Voiced",
+            "ipa_ex": "/ɡəʊ/",
+            "common_spellings": ["g", "gg"],
+            "minimal_pairs": ["go vs no", "got vs cot"],
+            "spanish_equivalent_or_hack": "Como la 'g' de 'gato', con cierre completo en la parte posterior de la boca y con voz.",
+            "common_error_spanish": "Suavizarla entre vocales hasta convertirla en una fricativa española."
+        },
+        {
+            "symbol": "f",
+            "example": "fly",
+            "type": "Unvoiced",
+            "ipa_ex": "/flaɪ/",
+            "common_spellings": ["f", "ff", "ph"],
+            "minimal_pairs": ["fine vs vine", "fan vs van"],
+            "spanish_equivalent_or_hack": "Es prácticamente igual que la 'f' española. Labio inferior contra dientes superiores y aire continuo, sin voz.",
+            "common_error_spanish": "Confundirla con /v/ al pronunciar palabras nuevas."
+        },
+        {
+            "symbol": "v",
+            "example": "van",
+            "type": "Voiced",
+            "ipa_ex": "/væn/",
+            "common_spellings": ["v"],
+            "minimal_pairs": ["van vs fan", "vine vs fine"],
+            "spanish_equivalent_or_hack": "No existe como fonema independiente en la mayoría del español. Apoya suavemente el labio inferior en los dientes superiores y deja pasar aire con voz.",
+            "common_error_spanish": "Pronunciarla como /b/ o quitarle la fricción y convertirla en una oclusiva."
+        },
+        {
+            "symbol": "θ",
+            "example": "think",
+            "type": "Unvoiced",
+            "ipa_ex": "/θɪŋk/",
+            "common_spellings": ["th"],
+            "minimal_pairs": ["think vs sink", "thin vs tin"],
+            "spanish_equivalent_or_hack": "Saca ligeramente la punta de la lengua entre los dientes y deja pasar aire sin voz.",
+            "common_error_spanish": "Sustituirla por /s/ o /t/."
+        },
+        {
+            "symbol": "ð",
+            "example": "this",
+            "type": "Voiced",
+            "ipa_ex": "/ðɪs/",
+            "common_spellings": ["th"],
+            "minimal_pairs": ["this vs dis", "then vs den"],
+            "spanish_equivalent_or_hack": "Como /θ/, pero con voz. Mantén la punta de la lengua entre los dientes y haz vibrar la voz.",
+            "common_error_spanish": "Sustituirla por /d/ o por /z/."
+        },
+        {
+            "symbol": "s",
+            "example": "sea",
+            "type": "Unvoiced",
+            "ipa_ex": "/siː/",
+            "common_spellings": ["s", "ss", "c"],
+            "minimal_pairs": ["sea vs she", "sink vs think"],
+            "spanish_equivalent_or_hack": "Como la 's' española estándar. Deja pasar un chorro estrecho de aire sin voz.",
+            "common_error_spanish": "Cecearla o confundirla con /ʃ/."
+        },
+        {
+            "symbol": "z",
+            "example": "zoo",
+            "type": "Voiced",
+            "ipa_ex": "/zuː/",
+            "common_spellings": ["z", "zz", "s"],
+            "minimal_pairs": ["zoo vs sue", "zip vs sip"],
+            "spanish_equivalent_or_hack": "Es como una 's' con voz, parecido al zumbido de una abeja. Mantén la misma fricción y añade vibración.",
+            "common_error_spanish": "Pronunciarla como /s/ porque el español no distingue normalmente ambos sonidos como fonemas."
+        },
+        {
+            "symbol": "ʃ",
+            "example": "shall",
+            "type": "Unvoiced",
+            "ipa_ex": "/ʃæl/",
+            "common_spellings": ["sh", "ti"],
+            "minimal_pairs": ["shall vs sell", "ship vs sip"],
+            "spanish_equivalent_or_hack": "No existe como fonema estándar en la mayoría del español. Redondea ligeramente los labios y lleva la lengua un poco hacia atrás; deja salir aire sin voz.",
+            "common_error_spanish": "Pronunciarla como /s/ o como /tʃ/."
+        },
+        {
+            "symbol": "ʒ",
+            "example": "vision",
+            "type": "Voiced",
+            "ipa_ex": "/ˈvɪʒ.ən/",
+            "common_spellings": ["si", "su", "ge"],
+            "minimal_pairs": ["vision vs mission", "beige vs base"],
+            "spanish_equivalent_or_hack": "No existe como fonema habitual en español. Haz /ʃ/ pero con voz, como un zumbido suave.",
+            "common_error_spanish": "Pronunciarla como /ʃ/ sorda o como /dʒ/."
+        },
+        {
+            "symbol": "m",
+            "example": "man",
+            "type": "Nasal",
+            "ipa_ex": "/mæn/",
+            "common_spellings": ["m", "mm"],
+            "minimal_pairs": ["man vs ban", "map vs nap"],
+            "spanish_equivalent_or_hack": "Igual que la 'm' española: labios cerrados y el aire sale por la nariz.",
+            "common_error_spanish": "Ningún error importante; concéntrate en no añadir una vocal después de la consonante."
+        },
+        {
+            "symbol": "n",
+            "example": "now",
+            "type": "Nasal",
+            "ipa_ex": "/naʊ/",
+            "common_spellings": ["n", "nn", "kn"],
+            "minimal_pairs": ["now vs mow", "nice vs mice"],
+            "spanish_equivalent_or_hack": "Muy parecida a la 'n' española. Apoya la punta de la lengua justo detrás de los dientes superiores y deja salir el aire por la nariz.",
+            "common_error_spanish": "Confundirla con /ŋ/ ante /k/ o /g/."
+        },
+        {
+            "symbol": "ŋ",
+            "example": "sing",
+            "type": "Nasal",
+            "ipa_ex": "/sɪŋ/",
+            "common_spellings": ["ng", "n"],
+            "minimal_pairs": ["sing vs sin", "rang vs ran"],
+            "spanish_equivalent_or_hack": "No aparece como fonema independiente en español. Lleva la parte posterior de la lengua hacia el velo y deja salir el aire por la nariz, sin cerrar los labios.",
+            "common_error_spanish": "Pronunciar /n/ o añadir una /g/ fuerte al final."
+        },
+        {
+            "symbol": "h",
+            "example": "hat",
+            "type": "Unvoiced",
+            "ipa_ex": "/hæt/",
+            "common_spellings": ["h"],
+            "minimal_pairs": ["hat vs at", "hay vs ay"],
+            "spanish_equivalent_or_hack": "No existe en el español estándar. Es una aspiración suave: abre la boca y deja salir aire, como para empañar un espejo.",
+            "common_error_spanish": "Omitirla o sustituirla por la 'j' española /x/."
+        },
+        {
+            "symbol": "l",
+            "example": "love",
+            "type": "Approximant",
+            "ipa_ex": "/lʌv/",
+            "common_spellings": ["l", "ll"],
+            "minimal_pairs": ["love vs glove", "light vs right"],
+            "spanish_equivalent_or_hack": "La 'l' inicial es muy parecida a la española. Toca con la punta de la lengua los alvéolos, justo detrás de los dientes superiores.",
+            "common_error_spanish": "Pronunciar igual la 'l' final; en inglés puede ser más oscura y retraída."
+        },
+        {
+            "symbol": "r",
+            "example": "red",
+            "type": "Approximant",
+            "ipa_ex": "/red/",
+            "common_spellings": ["r", "rr"],
+            "minimal_pairs": ["red vs led", "right vs light"],
+            "spanish_equivalent_or_hack": "No es la 'r' vibrante española. Retrae ligeramente la lengua y acércala al paladar sin tocarlo ni hacerla vibrar.",
+            "common_error_spanish": "Hacer una vibración simple o múltiple, especialmente al inicio de palabra."
+        },
+        {
+            "symbol": "w",
+            "example": "wet",
+            "type": "Approximant",
+            "ipa_ex": "/wet/",
+            "common_spellings": ["w", "wh"],
+            "minimal_pairs": ["wet vs yet", "wine vs vine"],
+            "spanish_equivalent_or_hack": "No equivale a /b/ ni a /v/. Redondea los labios como para 'u' y pasa inmediatamente a la vocal siguiente.",
+            "common_error_spanish": "Pronunciarla como /b/ o /v/."
+        },
+        {
+            "symbol": "j",
+            "example": "yes",
+            "type": "Approximant",
+            "ipa_ex": "/jes/",
+            "common_spellings": ["y", "i"],
+            "minimal_pairs": ["yes vs wet", "yet vs wet"],
+            "spanish_equivalent_or_hack": "Se parece a la 'y' de 'yo' en una pronunciación suave. Eleva la lengua hacia el paladar sin llegar a cerrar ni producir fricción fuerte.",
+            "common_error_spanish": "Convertirla en /dʒ/ o pronunciar una fricción demasiado fuerte."
+        }
+    ]
+}

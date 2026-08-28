@@ -1,0 +1,52 @@
+/* Transición suave para cambio de tema claro/oscuro */
+body {
+    transition: background-color 0.2s ease, color 0.2s ease;
+}
+
+/* Estilos de precisión en anotaciones de pronunciación */
+.correct {
+    color: #059669;
+    font-weight: 700;
+}
+.dark .correct {
+    color: #34d399;
+}
+
+.incorrect {
+    color: #e11d48;
+    text-decoration: underline;
+    font-weight: 700;
+    cursor: pointer;
+}
+.dark .incorrect {
+    color: #fb7185;
+}
+
+/* Canvas de onda de audio para grabación */
+canvas#waveform, canvas#rp-waveform {
+    display: block;
+    border-radius: 0.75rem;
+    transition: background-color 0.2s ease;
+}
+
+/* Scrollbar personalizado accesible para chat y paneles */
+::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+}
+::-webkit-scrollbar-track {
+    background: transparent;
+}
+::-webkit-scrollbar-thumb {
+    background: #cbd5e1;
+    border-radius: 9999px;
+}
+.dark ::-webkit-scrollbar-thumb {
+    background: #475569;
+}
+::-webkit-scrollbar-thumb:hover {
+    background: #94a3b8;
+}
+.dark ::-webkit-scrollbar-thumb:hover {
+    background: #64748b;
+}
