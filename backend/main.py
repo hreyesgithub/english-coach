@@ -258,16 +258,27 @@ class SuppressDisconnectMiddleware(BaseHTTPMiddleware):
 
 app.add_middleware(SuppressDisconnectMiddleware)
 
-# --- INSTANCIAS DE SERVICIOS ---
-# Si está en Render usa la API pública externa, si estás en local usa el servidor interno
-if os.environ.get("RENDER"):
-    # Engañamos a la librería configurando una ruta ficticia para el ejecutable de Java
-    os.environ["JAVA_HOME"] = "/usr"
-    
-    # Inicializamos usando estrictamente el servidor en la nube sin descargar nada local
-    lt = LanguageTool("en-US", remote_server="https://api.languagetool.org/")
+# --- INSTANCIA DE LANGUAGETOOL ---
+#
+# En producción/Render usamos el servidor remoto para evitar depender
+# de Java en el entorno de ejecución.
+#
+# En local puedes usar el servidor Java si tienes Java instalado.
+
+USE_REMOTE_LANGUAGETOOL = os.getenv("USE_REMOTE_LANGUAGETOOL", "").lower() in {
+    "1",
+    "true",
+    "yes",
+}
+
+if USE_REMOTE_LANGUAGETOOL:
+    logger.info("LanguageTool: usando servidor remoto.")
+    lt = LanguageTool(
+        "en-US",
+        remote_server="https://api.languagetool.org/",
+    )
 else:
-    # Configuración normal para tu computadora local (donde sí tienes Java)
+    logger.info("LanguageTool: usando servidor local.")
     lt = LanguageTool("en-US")
 
 
@@ -795,27 +806,48 @@ def next_placement_question(data: PlacementStepRequest):
 # --- ENDPOINT WRITING CHECK ---
 @app.post("/api/check-writing")
 def check_writing(data: WritingCheckRequest):
-    matches = lt.check(data.text)
-    feedback = []
-    for match in matches:
-        msg = (
-            getattr(match, "message", None)
-            or getattr(match, "msg", None)
-            or getattr(match, "shortMessage", None)
-            or getattr(match, "short_message", None)
-            or str(match)
-        )
-        short_msg = msg[:50] + "..." if len(msg) > 50 else msg
-        replacements = match.replacements[:3] if match.replacements else []
-        feedback.append(
-            {
+    try:
+        matches = lt.check(data.text)
+
+        feedback = []
+
+        for match in matches:
+            msg = (
+                getattr(match, "message", None)
+                or getattr(match, "msg", None)
+                or getattr(match, "shortMessage", None)
+                or getattr(match, "short_message", None)
+                or str(match)
+            )
+
+            short_msg = msg[:50] + "..." if len(msg) > 50 else msg
+
+            replacements = (
+                match.replacements[:3]
+                if match.replacements
+                else []
+            )
+
+            feedback.append({
                 "message": msg,
                 "short_message": short_msg,
                 "replacements": replacements,
-            }
+            })
+
+        score = max(0, 100 - len(matches) * 5)
+
+        return {
+            "feedback": feedback,
+            "score": score,
+        }
+
+    except Exception as e:
+        logger.exception("Error consultando LanguageTool")
+
+        raise HTTPException(
+            status_code=503,
+            detail="El corrector gramatical no está disponible temporalmente.",
         )
-    score = max(0, 100 - len(matches) * 5)
-    return {"feedback": feedback, "score": score}
 
 
 # --- ENDPOINTS DE GAMIFICACIÓN Y DESAFÍOS ---
