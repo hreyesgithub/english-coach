@@ -11,6 +11,8 @@ from pathlib import Path
 from datetime import date, datetime, timedelta
 from typing import List, Optional
 
+import assemblyai as aai
+
 import edge_tts  # type: ignore
 import eng_to_ipa as ipa  # type: ignore
 from dotenv import load_dotenv
@@ -18,8 +20,8 @@ from fastapi import FastAPI, File, Form, HTTPException, Query, Request, UploadFi
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, StreamingResponse
 
-from openai import OpenAI
-from openai.types.chat import ChatCompletionMessageParam
+# from openai import OpenAI
+# from openai.types.chat import ChatCompletionMessageParam
 import google.generativeai as genai
 from pydantic import BaseModel
 from starlette.middleware.base import BaseHTTPMiddleware
@@ -48,13 +50,22 @@ app.add_middleware(
 )
 
 # --- CONFIGURACIÓN DE LLM ---
-OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
-openai_client = OpenAI(api_key=OPENAI_API_KEY) if OPENAI_API_KEY else None
-if not openai_client:
+# OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
+# openai_client = OpenAI(api_key=OPENAI_API_KEY) if OPENAI_API_KEY else None
+# if not openai_client:
+#    logger.warning(
+#        "OPENAI_API_KEY no está configurada: el Roleplay funcionará en modo "
+#        "'fallback' con respuestas guionizadas, no con el LLM real."
+#    )
+
+ASSEMBLYAI_API_KEY = os.getenv("ASSEMBLYAI_API_KEY")
+if not ASSEMBLYAI_API_KEY:
     logger.warning(
-        "OPENAI_API_KEY no está configurada: el Roleplay funcionará en modo "
-        "'fallback' con respuestas guionizadas, no con el LLM real."
+        "ASSEMBLYAI_API_KEY no está configurada: la evaluación de lectura no funcionará."
     )
+else:
+    aai.settings.api_key = ASSEMBLYAI_API_KEY
+    logger.info("AssemblyAI configurado correctamente.")
 
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 if GEMINI_API_KEY:
@@ -601,12 +612,7 @@ async def roleplay_respond(data: RoleplayMessageRequest, request: Request):
         f"Tu rol: {scenario['role']}."
     )
 
-    messages: list[ChatCompletionMessageParam] = [
-        {
-            "role": "system",
-            "content": system_prompt,
-        }
-    ]
+    messages = [{"role": "system", "content": system_prompt}]
 
     # --- FIX: el frontend ya empuja el mensaje del usuario a `conversation_history`
     # ANTES de llamar al endpoint (ver roleplayHistory.push en app.js), y aquí se
@@ -966,30 +972,15 @@ async def evaluate_reading(
     target_text: str = Form(...), audio_file: UploadFile = File(...)
 ):
     """
-    Transcribe el audio leído por el estudiante.
-
-    Antes esto se hacía con openai-whisper + torch cargados en local
-    (whisper.load_model("base")). Esa combinación por sí sola ya pesa
-    varios cientos de MB de RAM en reposo (más ~1-2GB de imagen Docker por
-    torch), algo inviable en el plan gratuito de Render (512MB de RAM):
-    el proceso moría por OOM en cuanto llegaba la primera petición, o
-    directamente no arrancaba.
-
-    Ahora se delega la transcripción a la API de Whisper de OpenAI (nube):
-    el cliente `openai_client` ya estaba inicializado en este archivo y
-    no se usaba en ningún otro sitio. Coste extra: cada llamada consume
-    cuota de la API (unos $0.006/minuto de audio a precios de Whisper-1),
-    a cambio de no tocar RAM ni disco del servidor.
+    Transcribe el audio leído por el estudiante usando AssemblyAI.
     """
-    if not openai_client:
+    if not ASSEMBLYAI_API_KEY:
         raise HTTPException(
             status_code=503,
-            detail=(
-                "La evaluación de lectura requiere configurar OPENAI_API_KEY "
-                "en las variables de entorno de Render."
-            ),
+            detail="La evaluación de lectura requiere configurar ASSEMBLYAI_API_KEY en las variables de entorno.",
         )
 
+    # Guardar el audio temporalmente
     suffix = Path(audio_file.filename or "audio.wav").suffix or ".wav"
     tmp_path = None
     try:
@@ -998,17 +989,22 @@ async def evaluate_reading(
             tmp.write(content)
             tmp_path = tmp.name
 
-        with open(tmp_path, "rb") as audio_fp:
-            transcription = openai_client.audio.transcriptions.create(
-                model="whisper-1",
-                file=audio_fp,
-                language="en",
+        # Transcribir con AssemblyAI
+        transcriber = aai.Transcriber()
+        transcript = transcriber.transcribe(tmp_path)
+        transcript_error = getattr(transcript, "error", None)
+
+        if transcript_error:
+            logger.error(f"Error en AssemblyAI: {transcript_error}")
+            raise HTTPException(
+                status_code=500,
+                detail=f"Error al transcribir el audio: {transcript_error}",
             )
-        spoken_text = str(transcription.text).strip()
-    except HTTPException:
-        raise
+
+        spoken_text = (getattr(transcript, "text", "") or "").strip()
+
     except Exception as e:
-        logger.exception("Error al transcribir audio con la API de OpenAI")
+        logger.exception("Error al transcribir audio con AssemblyAI")
         raise HTTPException(500, f"Error al procesar el audio: {str(e)}")
     finally:
         if tmp_path:
@@ -1017,6 +1013,12 @@ async def evaluate_reading(
             except (NameError, FileNotFoundError, OSError):
                 pass
 
+    if not spoken_text:
+        raise HTTPException(
+            400, detail="No se pudo reconocer ninguna palabra en el audio."
+        )
+
+    # El resto del código (evaluación de pronunciación, IPA, SRS) permanece IGUAL
     target_ipa = ipa.convert(target_text)
     spoken_ipa = ipa.convert(spoken_text)
     score = round(
@@ -1054,7 +1056,6 @@ async def evaluate_reading(
         conn.commit()
         conn.close()
 
-    # Actualizar progreso (palabras acertadas)
     words_passed = len(target_words) - len(failed_words)
     update_daily_progress(user_id="default", words=words_passed)
 
