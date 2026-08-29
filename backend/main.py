@@ -1,11 +1,3 @@
-import collections
-
-# --- PARCHE DE COMPATIBILIDAD OBLIGATORIO PARA PYTHON 3.10+ ---
-if not hasattr(collections, "MutableMapping"):
-    import collections.abc as abc
-
-    setattr(collections, "MutableMapping", abc.MutableMapping)
-
 import difflib
 import io
 import json
@@ -26,12 +18,6 @@ from fastapi import FastAPI, File, Form, HTTPException, Query, Request, UploadFi
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, StreamingResponse
 
-try:
-    import whisper  # type: ignore
-except Exception:  # pragma: no cover - depende del entorno
-    whisper = None
-
-# from language_tool_python import LanguageTool  # type: ignore[import-not-found]
 from openai import OpenAI
 from openai.types.chat import ChatCompletionMessageParam
 import google.generativeai as genai
@@ -49,7 +35,14 @@ app = FastAPI(title="LinguaBoost Pro API", version="4.0.0")
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
-    allow_credentials=True,
+    # El backend no usa cookies ni sesiones (no hay login), así que no hace
+    # falta allow_credentials=True. Iba combinado con allow_origins=["*"],
+    # una mezcla que los navegadores tratan como violación del spec CORS y
+    # que Starlette "arregla" reflejando el Origin recibido: en la práctica
+    # equivale a aceptar cualquier origen con credenciales, más permisivo
+    # de lo necesario. Si en el futuro se necesitan cookies/auth, sustituir
+    # allow_origins=["*"] por la lista explícita de dominios del frontend.
+    allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -272,8 +265,6 @@ class SuppressDisconnectMiddleware(BaseHTTPMiddleware):
 
 app.add_middleware(SuppressDisconnectMiddleware)
 
-
-whisper_model = whisper.load_model("base") # type:ignore
 
 # --- FUNCIONES AUXILIARES ---
 def get_user_stats(user_id: str = "default"):
@@ -974,16 +965,57 @@ def get_user_progress(user_id: str = "default", days: int = 30):
 async def evaluate_reading(
     target_text: str = Form(...), audio_file: UploadFile = File(...)
 ):
+    """
+    Transcribe el audio leído por el estudiante.
+
+    Antes esto se hacía con openai-whisper + torch cargados en local
+    (whisper.load_model("base")). Esa combinación por sí sola ya pesa
+    varios cientos de MB de RAM en reposo (más ~1-2GB de imagen Docker por
+    torch), algo inviable en el plan gratuito de Render (512MB de RAM):
+    el proceso moría por OOM en cuanto llegaba la primera petición, o
+    directamente no arrancaba.
+
+    Ahora se delega la transcripción a la API de Whisper de OpenAI (nube):
+    el cliente `openai_client` ya estaba inicializado en este archivo y
+    no se usaba en ningún otro sitio. Coste extra: cada llamada consume
+    cuota de la API (unos $0.006/minuto de audio a precios de Whisper-1),
+    a cambio de no tocar RAM ni disco del servidor.
+    """
+    if not openai_client:
+        raise HTTPException(
+            status_code=503,
+            detail=(
+                "La evaluación de lectura requiere configurar OPENAI_API_KEY "
+                "en las variables de entorno de Render."
+            ),
+        )
+
+    suffix = Path(audio_file.filename or "audio.wav").suffix or ".wav"
+    tmp_path = None
     try:
-        with tempfile.NamedTemporaryFile(delete=False, suffix=".wav") as tmp:
+        with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
             content = await audio_file.read()
             tmp.write(content)
             tmp_path = tmp.name
-        result = whisper_model.transcribe(tmp_path)
-        spoken_text = str(result["text"]).strip()
-        os.unlink(tmp_path)
+
+        with open(tmp_path, "rb") as audio_fp:
+            transcription = openai_client.audio.transcriptions.create(
+                model="whisper-1",
+                file=audio_fp,
+                language="en",
+            )
+        spoken_text = str(transcription.text).strip()
+    except HTTPException:
+        raise
     except Exception as e:
+        logger.exception("Error al transcribir audio con la API de OpenAI")
         raise HTTPException(500, f"Error al procesar el audio: {str(e)}")
+    finally:
+        if tmp_path:
+            try:
+                os.unlink(tmp_path)
+            except (NameError, FileNotFoundError, OSError):
+                pass
 
     target_ipa = ipa.convert(target_text)
     spoken_ipa = ipa.convert(spoken_text)
