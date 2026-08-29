@@ -4,7 +4,7 @@ pydantic==2.6.4
 requests==2.31.0
 python-multipart==0.0.9
 eng-to-ipa==0.0.2
-edge-tts==6.1.9
+edge-tts
 openai>=1.0.0
 google-generativeai>=0.3.0
 language-tool-python>=2.7.0

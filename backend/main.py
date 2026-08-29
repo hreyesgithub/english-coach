@@ -26,6 +26,11 @@ from fastapi import FastAPI, File, Form, HTTPException, Query, Request, UploadFi
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, StreamingResponse
 
+try:
+    import whisper  # type: ignore
+except Exception:  # pragma: no cover - depende del entorno
+    whisper = None
+
 # from language_tool_python import LanguageTool  # type: ignore[import-not-found]
 from openai import OpenAI
 from openai.types.chat import ChatCompletionMessageParam
@@ -267,6 +272,8 @@ class SuppressDisconnectMiddleware(BaseHTTPMiddleware):
 
 app.add_middleware(SuppressDisconnectMiddleware)
 
+
+whisper_model = whisper.load_model("base") # type:ignore
 
 # --- FUNCIONES AUXILIARES ---
 def get_user_stats(user_id: str = "default"):
@@ -843,11 +850,7 @@ async def check_writing(data: WritingCheckRequest):
                     "message": message,
                     "short_message": (
                         short_message
-                        or (
-                            message[:50] + "..."
-                            if len(message) > 50
-                            else message
-                        )
+                        or (message[:50] + "..." if len(message) > 50 else message)
                     ),
                     "replacements": replacements,
                 }
@@ -880,9 +883,7 @@ async def check_writing(data: WritingCheckRequest):
         )
 
     except Exception:
-        logger.exception(
-            "Error inesperado consultando LanguageTool."
-        )
+        logger.exception("Error inesperado consultando LanguageTool.")
 
         raise HTTPException(
             status_code=503,
@@ -966,4 +967,68 @@ def get_user_progress(user_id: str = "default", days: int = 30):
         "xp": [r[1] for r in rows],
         "words": [r[2] for r in rows],
         "roleplays": [r[3] for r in rows],
+    }
+
+
+@app.post("/api/evaluate-reading")
+async def evaluate_reading(
+    target_text: str = Form(...), audio_file: UploadFile = File(...)
+):
+    try:
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".wav") as tmp:
+            content = await audio_file.read()
+            tmp.write(content)
+            tmp_path = tmp.name
+        result = whisper_model.transcribe(tmp_path)
+        spoken_text = str(result["text"]).strip()
+        os.unlink(tmp_path)
+    except Exception as e:
+        raise HTTPException(500, f"Error al procesar el audio: {str(e)}")
+
+    target_ipa = ipa.convert(target_text)
+    spoken_ipa = ipa.convert(spoken_text)
+    score = round(
+        difflib.SequenceMatcher(None, target_ipa, spoken_ipa).ratio() * 100, 1
+    )
+
+    target_words = target_text.split()
+    word_analysis = []
+    failed_words = []
+    for tw in target_words:
+        if tw.lower() in spoken_text.lower():
+            word_analysis.append(
+                {"word": tw, "status": "correct", "ipa": f"/{ipa.convert(tw)}/"}
+            )
+        else:
+            word_analysis.append(
+                {"word": tw, "status": "incorrect", "ipa": f"/{ipa.convert(tw)}/"}
+            )
+            failed_words.append(tw)
+
+    if failed_words:
+        conn = sqlite3.connect(DB_NAME)
+        c = conn.cursor()
+        today = date.today()
+        for fw in failed_words:
+            fipa = f"/{ipa.convert(fw)}/"
+            c.execute(
+                """
+                INSERT INTO srs_words (word, ipa, level, next_review, times_failed)
+                VALUES (?, ?, 1, ?, 1)
+                ON CONFLICT(word) DO UPDATE SET level=1, next_review=?, times_failed=times_failed+1
+            """,
+                (fw, fipa, today, today),
+            )
+        conn.commit()
+        conn.close()
+
+    # Actualizar progreso (palabras acertadas)
+    words_passed = len(target_words) - len(failed_words)
+    update_daily_progress(user_id="default", words=words_passed)
+
+    return {
+        "accuracy_score": score,
+        "spoken_text": spoken_text,
+        "word_analysis": word_analysis,
+        "failed_words_count": len(failed_words),
     }
