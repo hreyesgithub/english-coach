@@ -2,8 +2,10 @@
 // LinguaBoost Pro - Frontend Application Engine (v4.5 High Contrast)
 // ==========================================
 
-//const API_BASE_URL = "http://127.0.0.1:8000"; // Para pruebas locales
-const API_BASE_URL = "https://english-coach-ekm0.onrender.com"; // Para pruebas en Render
+// Para pruebas locales
+//const API_BASE_URL = "http://127.0.0.1:8000"; 
+// Para pruebas en Render
+const API_BASE_URL = "https://english-coach-ekm0.onrender.com";  
 
 // Estado global
 let curriculumData = {};
