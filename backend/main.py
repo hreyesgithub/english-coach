@@ -26,7 +26,7 @@ from fastapi import (
     Request,
     UploadFile,
     Depends,
-    status
+    status,
 )
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, StreamingResponse
@@ -37,7 +37,6 @@ from starlette.middleware.base import BaseHTTPMiddleware
 from uvicorn.protocols.utils import ClientDisconnected
 from supabase import create_client, Client
 
-from postgrest.types import CountMethod
 
 load_dotenv()
 
@@ -113,7 +112,9 @@ def get_gemini_model(system_instruction: str):
 
 # --- CARGA DE CONTENIDO DESDE ARCHIVOS JSON ---
 # Usamos un solo .parent para quedarnos en la carpeta actual ('backend' o 'src')
-CONTENT_DIR = Path(os.getenv("CONTENT_DIR", str(Path(__file__).resolve().parent / "content")))
+CONTENT_DIR = Path(
+    os.getenv("CONTENT_DIR", str(Path(__file__).resolve().parent / "content"))
+)
 
 
 def load_content(filename: str):
@@ -518,12 +519,14 @@ def health_check():
         "status": "healthy",
         "timestamp": datetime.now(timezone.utc).isoformat(),
         "database": "connected" if supabase is not None else "disconnected",
-        "version": app.version
+        "version": app.version,
     }
+
 
 @app.get("/api/ipa-matrix")
 def get_ipa_matrix():
     return IPA_PHONEMES
+
 
 @app.get("/health/supabase", tags=["System"])
 def supabase_health_check():
@@ -531,7 +534,7 @@ def supabase_health_check():
     if not supabase:
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="Cliente de Supabase no instanciado. Revisa las variables SUPABASE_URL y SUPABASE_KEY."
+            detail="Cliente de Supabase no instanciado. Revisa las variables SUPABASE_URL y SUPABASE_KEY.",
         )
 
     start_time = time.time()
@@ -545,14 +548,15 @@ def supabase_health_check():
             "database": "supabase",
             "connected": True,
             "latency": f"{latency_ms} ms",
-            "timestamp": datetime.now(timezone.utc).isoformat()
+            "timestamp": datetime.now(timezone.utc).isoformat(),
         }
     except Exception as e:
         logger.error(f"Fallo en la prueba de vida de Supabase: {e}")
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail=f"Error de conexión con Supabase: {str(e)}"
+            detail=f"Error de conexión con Supabase: {str(e)}",
         )
+
 
 @app.get("/api/curriculum")
 def get_curriculum():
@@ -577,11 +581,11 @@ def get_ipa_transcription(
 
 @app.get("/api/tts-natural")
 async def text_to_speech_natural(
-        text: str = Query(..., max_length=MAX_TEXT_LEN),
-        voice: str = Query("en-US-AvaMultilingualNeural"), # antes: en-US-AriaNeural
-        rate: str = Query("-8%"),   # ligeramente más lento = menos "metralleta"
-        pitch: str = Query("+0Hz"),
-    ):
+    text: str = Query(..., max_length=MAX_TEXT_LEN),
+    voice: str = Query("en-US-AvaMultilingualNeural"),  # antes: en-US-AriaNeural
+    rate: str = Query("-8%"),  # ligeramente más lento = menos "metralleta"
+    pitch: str = Query("+0Hz"),
+):
     try:
         clean_text = text.replace("'", "").replace("’", "")
         communicate = edge_tts.Communicate(clean_text, voice, rate=rate, pitch=pitch)
@@ -710,43 +714,63 @@ def review_srs_word(data: SRSReviewRequest, user_id: str = Depends(get_current_u
 
 
 @app.get("/api/srs/stats")
-def get_srs_stats():
+def get_srs_stats(authorization: Optional[str] = Header(None)):
     if not supabase:
         return {"total_words": 0, "due_today": 0, "mastered_words": 0}
-    today_str = datetime.now().date().isoformat()
-    try:
-        res_total = (
-            supabase.table("srs_words").select("id", count=CountMethod.exact).execute()
-        )
-        res_due = (
-            supabase.table("srs_words")
-            .select("id", count=CountMethod.exact)
-            .lte("next_review", today_str)
-            .execute()
-        )
-        res_mastered = (
-            supabase.table("srs_words")
-            .select("id", count=CountMethod.exact)
-            .eq("level", 5)
-            .execute()
-        )
-    except Exception as e:
-        logger.error(f"Error Supabase (srs stats): {e}")
-        raise HTTPException(
-            status_code=503, detail="Servicio de base de datos no disponible."
-        )
 
-    return {
-        "total_words": (
-            res_total.count if res_total.count is not None else len(res_total.data)
-        ),
-        "due_today": res_due.count if res_due.count is not None else len(res_due.data),
-        "mastered_words": (
-            res_mastered.count
-            if res_mastered.count is not None
-            else len(res_mastered.data)
-        ),
-    }
+    # Extraer token si usas RLS o filtrado por usuario
+    user_id = None
+    if authorization and authorization.startswith("Bearer "):
+        token = authorization.split(" ")[1]
+        try:
+            user_response = supabase.auth.get_user(token)
+            if user_response and user_response.user:
+                user_id = user_response.user.id
+        except Exception as auth_err:
+            logger.warning(f"No se pudo validar el token en SRS stats: {auth_err}")
+
+    today_str = datetime.now().date().isoformat()
+
+    try:
+        # 1. Total de palabras (filtrado por usuario si existe user_id)
+        query_total = supabase.table("srs_words").select("id", count=cast(Any, "exact"))
+        if user_id:
+            query_total = query_total.eq("user_id", user_id)
+        res_total = query_total.execute()
+
+        # 2. Palabras pendientes para hoy
+        query_due = (
+            supabase.table("srs_words")
+            .select("id", count=cast(Any, "exact"))
+            .lte("next_review", today_str)
+        )
+        if user_id:
+            query_due = query_due.eq("user_id", user_id)
+        res_due = query_due.execute()
+
+        # 3. Palabras dominadas (Nivel 5)
+        query_mastered = (
+            supabase.table("srs_words")
+            .select("id", count=cast(Any, "exact"))
+            .eq("level", 5)
+        )
+        if user_id:
+            query_mastered = query_mastered.eq("user_id", user_id)
+        res_mastered = query_mastered.execute()
+
+        return {
+            "total_words": res_total.count if res_total.count is not None else len(res_total.data),
+            "due_today": res_due.count if res_due.count is not None else len(res_due.data),
+            "mastered_words": res_mastered.count if res_mastered.count is not None else len(res_mastered.data),
+        }
+
+    except Exception as e:
+        # Revisa los logs de Render para ver exactamente qué falló
+        logger.error(f"Error detallado de Supabase (srs stats): {str(e)}")
+        raise HTTPException(
+            status_code=503, 
+            detail=f"Error en base de datos: {str(e)}"
+        )
 
 
 # --- ROLEPLAY & PLACEMENT TEST ---

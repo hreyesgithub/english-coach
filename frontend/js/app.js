@@ -381,6 +381,9 @@ async function fetchDailyChallenge() {
 async function completeMission(missionId, btnElement) {
     if (processing.mission) return;
     processing.mission = true;
+
+    showLoadingAlert("Completando misión", "Guardando tus puntos...");
+
     if (btnElement) {
         btnElement.disabled = true;
         btnElement.classList.add("opacity-50", "cursor-not-allowed");
@@ -410,6 +413,7 @@ async function completeMission(missionId, btnElement) {
         }
     } catch (e) {
         console.error("Error al completar misión:", e);
+        hideLoadingAlert();
         Swal.fire({
             icon: "error",
             title: "Error",
@@ -509,36 +513,100 @@ function renderCurrentUnit() {
     if (results) results.classList.add("hidden");
 }
 
-// --- AUDIO SÍNTESIS CON BLOQUEO ---
+// --- AUDIO SÍNTESIS CON BLOQUEO Y SWEETALERT2 ---
 function playNaturalAudio(text, voice = "en-US-AriaNeural") {
     if (!text || processing.audio) return;
     processing.audio = true;
+
+    // 1. Mostrar aviso de carga con SweetAlert2 para bloquear clics
+    Swal.fire({
+        title: 'Generando audio...',
+        text: 'Por favor espera la respuesta del servidor',
+        allowOutsideClick: false,
+        allowEscapeKey: false,
+        showConfirmButton: false,
+        didOpen: () => {
+            Swal.showLoading();
+        }
+    });
+
     const audioUrl = `${API_BASE_URL}/api/tts-natural?text=${encodeURIComponent(text)}&voice=${voice}`;
     const audio = new Audio(audioUrl);
 
-    audio.onended = () => {
+    // Función auxiliar para desbloquear el estado global
+    const releaseAudio = () => {
         processing.audio = false;
-    };
-    audio.onerror = () => {
-        processing.audio = false;
+        Swal.close();
     };
 
-    audio.play().catch(() => {
+    // 2. Cuando el audio empieza a sonar, cerramos el aviso
+    audio.onplay = () => {
+        Swal.close();
+    };
+
+    // 3. Cuando termina de reproducirse
+    audio.onended = () => {
+        releaseAudio();
+    };
+
+    // 4. Si hay error en la API de Render, usar el fallback del navegador
+    audio.onerror = () => {
         window.speechSynthesis.cancel();
         const utterance = new SpeechSynthesisUtterance(text);
         utterance.lang = "en-US";
+        
+        utterance.onstart = () => {
+            Swal.close();
+        };
         utterance.onend = () => {
-            processing.audio = false;
+            releaseAudio();
         };
         utterance.onerror = () => {
-            processing.audio = false;
+            releaseAudio();
         };
+        
+        window.speechSynthesis.speak(utterance);
+    };
+
+    // Intentar reproducir
+    // --- AUDIO SÍNTESIS CON BLOQUEO Y SWEETALERT2 ---
+    audio.play().catch(() => {
+        // Fallback inmediato si el navegador bloquea la reproducción automática
+        window.speechSynthesis.cancel();
+        const utterance = new SpeechSynthesisUtterance(text);
+        utterance.lang = "en-US";
+        
+        utterance.onstart = () => {
+            Swal.close();
+        };
+        utterance.onend = () => {
+            releaseAudio();
+        };
+        utterance.onerror = () => {
+            releaseAudio();
+        };
+        
         window.speechSynthesis.speak(utterance);
     });
 }
 
-function playTargetAudio() {
-    if (currentUnit) playNaturalAudio(currentUnit.text);
+function playTargetAudio(btnElement = null) {
+    if (processing.audio) return;
+    
+    if (btnElement) {
+        btnElement.disabled = true;
+        btnElement.classList.add("opacity-50", "cursor-not-allowed");
+        
+        // Re-habilitar botón tras 3 segundos o cuando el audio empiece
+        setTimeout(() => {
+            btnElement.disabled = false;
+            btnElement.classList.remove("opacity-50", "cursor-not-allowed");
+        }, 3000);
+    }
+
+    if (currentUnit) {
+        playNaturalAudio(currentUnit.text);
+    }
 }
 
 // --- RECONOCIMIENTO Y EVALUACIÓN DE PRONUNCIACIÓN ---
@@ -777,6 +845,8 @@ async function analyzeWriting(e) {
     if (processing.writing) return;
     processing.writing = true;
 
+    showLoadingAlert("Analizando gramática", "Enviando tu texto al servidor...");
+
     const btn = document.getElementById("btn-analyze-writing");
     btn.disabled = true;
     btn.classList.add("opacity-50", "cursor-not-allowed");
@@ -789,6 +859,7 @@ async function analyzeWriting(e) {
 
         const text = input.value.trim();
         if (!text) {
+            hideLoadingAlert();
             await Swal.fire({
                 icon: "warning",
                 title: "Texto vacío",
@@ -847,6 +918,7 @@ async function analyzeWriting(e) {
                     ⚠️ Ocurrió un error al conectar con el servidor.
                 </div>`;
         }
+        hideLoadingAlert();
         Swal.fire({
             icon: "error",
             title: "Error",
@@ -949,6 +1021,8 @@ async function conectarConServidorRender(endpoint) {
         return { ok: false, status: 401 };
     }
 
+    showLoadingAlert("Conectando con el servidor de Render", "Sincronizando con el servidor...");
+
     try {
         const response = await fetch(`${API_BASE_URL}${endpoint}`, {
             method: "GET",
@@ -964,6 +1038,9 @@ async function conectarConServidorRender(endpoint) {
     } catch (error) {
         console.error("Error de conexión con la API:", error);
         return { ok: false, status: 500 };
+    }
+    finally {
+        hideLoadingAlert();
     }
 }
 
@@ -1361,6 +1438,9 @@ async function sendRoleplayMessage(e) {
     }
     if (processing.roleplay) return;
     processing.roleplay = true;
+
+    showLoadingAlert("Procesando respuesta roleplay", "El tutor AI está respondiendo...");
+
     const btn = document.getElementById("btn-send-rp");
     btn.disabled = true;
     btn.classList.add("opacity-50", "cursor-not-allowed");
@@ -1370,7 +1450,10 @@ async function sendRoleplayMessage(e) {
         const input = document.getElementById("rp-transcript-input");
         if (!input) return;
         const userText = input.value.trim();
-        if (!userText || !currentScenario) return;
+        if (!userText || !currentScenario) {
+            hideLoadingAlert();
+            return;
+        }
 
         appendRPMessage("user", userText);
         roleplayHistory.push({ role: "user", content: userText });
@@ -1408,6 +1491,7 @@ async function sendRoleplayMessage(e) {
             "bot",
             "Ups, hubo un problema de conexión con el tutor. Intenta de nuevo en unos segundos.",
         );
+        hideLoadingAlert();
         Swal.fire({
             icon: "error",
             title: "Error",
@@ -1837,4 +1921,23 @@ function initializeApp() {
         fetchDailyChallenge();
     });
     initWaveform();
+}
+
+// Muestra el modal de carga bloqueando clics externos
+function showLoadingAlert(title = "Procesando...", text = "Por favor espera mientras el servidor responde.") {
+    Swal.fire({
+        title: title,
+        text: text,
+        allowOutsideClick: false,
+        allowEscapeKey: false,
+        showConfirmButton: false,
+        didOpen: () => {
+            Swal.showLoading();
+        }
+    });
+}
+
+// Cierra la alerta activa
+function hideLoadingAlert() {
+    Swal.close();
 }
