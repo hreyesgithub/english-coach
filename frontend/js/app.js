@@ -59,8 +59,11 @@ const processing = {
 };
 
 // --- 1. INICIALIZACIÓN ---
-document.addEventListener("DOMContentLoaded", () => {
+document.addEventListener("DOMContentLoaded", async () => {
     initDarkMode();
+
+    // Verificación automática de sesión activa con Supabase
+    await checkAutoLogin();
 
     // VERIFICACIÓN DE SESIÓN
     if (!authToken) {
@@ -115,6 +118,39 @@ document.addEventListener("DOMContentLoaded", () => {
         }
     });
 });
+
+async function checkAutoLogin() {
+    try {
+        // Supabase comprueba el almacenamiento local y refresca el token si venció
+        const { data: { session }, error } = await supabaseClient.auth.getSession();
+
+        if (session && !error) {
+            // Sesión válida: actualizamos variables y cargamos la app
+            authToken = session.access_token;
+            currentUsername = session.user.email;
+            localStorage.setItem("auth_token", authToken);
+            localStorage.setItem("current_username", currentUsername);
+
+            hideLoginModal();
+            initializeApp();
+        } else {
+            // No hay sesión o está expirada
+            clearSessionStorage();
+            showLoginModal();
+        }
+    } catch (err) {
+        console.error("Error verificando sesión automática:", err);
+        clearSessionStorage();
+        showLoginModal();
+    }
+}
+
+function clearSessionStorage() {
+    authToken = null;
+    currentUsername = null;
+    localStorage.removeItem("auth_token");
+    localStorage.removeItem("current_username");
+}
 
 // --- MODO OSCURO ---
 function initDarkMode() {
@@ -394,8 +430,6 @@ async function completeMission(missionId, btnElement) {
 async function fetchCurriculum() {
     const select = document.getElementById("material-select");
     const display = document.getElementById("text-display");
-
-    console.warn("fetchCurriculum: authToken =", authToken); // Depuración
 
     try {
         const res = await conectarConServidorRender('/api/curriculum');
@@ -1780,10 +1814,15 @@ async function handleLogin(e) {
     }
 }
 
-function handleLogout() {
-    localStorage.removeItem("auth_token");
-    localStorage.removeItem("current_username");
-    window.location.reload(); // Recargar limpia la interfaz y muestra el modal
+async function handleLogout() {
+    try {
+        await supabaseClient.auth.signOut(); // Cierra la sesión en el cliente de Supabase
+    } catch (e) {
+        console.error("Error al cerrar sesión en Supabase:", e);
+    } finally {
+        clearSessionStorage();
+        window.location.reload(); // Recarga y muestra el modal de login
+    }
 }
 
 // Envuelve las llamadas iniciales para ejecutarlas SÓLO tras iniciar sesión
