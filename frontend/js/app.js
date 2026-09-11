@@ -909,25 +909,28 @@ async function fetchSRSDueWords() {
 
 //localStorage.clear();
 
-async function conectarConServidorRender(endpoint){
-
+async function conectarConServidorRender(endpoint) {
     if (!authToken) {
-        console.error("No se encontró token de autenticación. Redirigiendo a login...");
-        return false; // O manejar la redirección a la pantalla de login
+        console.error("No se encontró token de autenticación.");
+        return { ok: false, status: 401 };
     }
-  
-    return await fetch(`${API_BASE_URL}${endpoint}`, {
+
+    try {
+        const response = await fetch(`${API_BASE_URL}${endpoint}`, {
             method: "GET",
             headers: { Authorization: `Bearer ${authToken}` },
-        }).then((response) => {
-            if (response.status === 401) {
-                console.error(
-                    "Sesión expirada o no autorizada. Redirigiendo a login...",
-                );
-                // Opcional: redirigir a pantalla de login
-            }
-            return response.json();
         });
+
+        if (response.status === 401) {
+            console.error("Sesión expirada o no autorizada.");
+            handleLogout();
+        }
+
+        return response; // Devuelve el objeto Response completo
+    } catch (error) {
+        console.error("Error de conexión con la API:", error);
+        return { ok: false, status: 500 };
+    }
 }
 
 function renderSRSCard() {
@@ -1759,9 +1762,10 @@ async function handleLogin(e) {
 
         authToken = data.session.access_token;
         currentUsername = data.user.email;
+        
+        // Guardar explícitamente en localStorage
+        localStorage.setItem("auth_token", authToken);
         localStorage.setItem("current_username", currentUsername);
-        // No necesitas guardar authToken manualmente: el SDK ya persiste
-        // la sesión (y la refresca sola) en su propio storage.
 
         hideLoginModal();
         initializeApp();
