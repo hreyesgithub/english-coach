@@ -36,6 +36,9 @@ let ptState = {
     selectedOption: null,
     history: []
 };
+// Variable global para autenticación
+let authToken = localStorage.getItem('auth_token') || null;
+let currentUsername = localStorage.getItem('current_username') || null;
 
 const LEVEL_ORDER = ["A1", "A2", "B1", "B2", "C1", "C2"];
 
@@ -55,7 +58,14 @@ const processing = {
 // --- 1. INICIALIZACIÓN ---
 document.addEventListener("DOMContentLoaded", () => {
     initDarkMode();
-    fetchCurriculum();
+
+    // VERIFICACIÓN DE SESIÓN
+    if (!authToken) {
+        showLoginModal();
+    } else {
+        initializeApp();
+    }
+
     setupSpeechRecognition();
     fetchSRSStats();
     fetchSRSDueWords();
@@ -244,10 +254,19 @@ async function fetchProgressData() {
     } catch (e) { console.error('Error cargando gráfico:', e); }
 }
 
-// --- DESAFÍO DIARIO ---
+// --- DESAFÍO DIARIO ACORDE AL NIVEL ---
 async function fetchDailyChallenge() {
     try {
-        const res = await fetch(`${API_BASE_URL}/api/daily-challenge`);
+        // Obtenemos el nivel actual del usuario (por defecto A1 si está fallando)
+        const userLevel = userStats.level || 'A1';
+        
+        // Pasamos el nivel y el token como parámetros para que el backend devuelva desafíos personalizados
+        const res = await fetch(`${API_BASE_URL}/api/daily-challenge?level=${userLevel}`, {
+            headers: {
+                'Authorization': `Bearer ${authToken}` // Enviando token al backend
+            }
+        });
+        
         if (!res.ok) return;
         const data = await res.json();
         const container = document.getElementById('challenge-missions');
@@ -256,7 +275,9 @@ async function fetchDailyChallenge() {
         container.innerHTML = data.missions.map(m => `
             <div class="bg-slate-50 dark:bg-slate-700/60 p-4 rounded-xl border border-slate-200 dark:border-slate-600">
                 <div class="flex items-center justify-between mb-2">
-                    <span class="text-sm font-bold text-amber-700 dark:text-amber-400">Misión ${m.id}</span>
+                    <span class="text-sm font-bold text-amber-700 dark:text-amber-400">
+                        Nivel ${userLevel} - Misión ${m.id}
+                    </span>
                     <button onclick="completeMission(${m.id}, this)" class="text-xs bg-amber-600 hover:bg-amber-700 text-white px-3 py-1 rounded-lg transition font-semibold">Completar</button>
                 </div>
                 <p class="text-slate-800 dark:text-slate-100 font-medium">${m.text}</p>
@@ -1431,4 +1452,83 @@ function switchTab(tabName) {
         case 'challenge': fetchDailyChallenge(); break;
         case 'reading': renderCurriculum(); break;
     }
+}
+
+// --- FUNCIONES DE AUTENTICACIÓN ---
+function showLoginModal() {
+    const modal = document.getElementById('auth-modal');
+    if (modal) {
+        modal.classList.remove('hidden');
+        document.body.style.overflow = 'hidden'; // Bloquear scroll
+    }
+}
+
+function hideLoginModal() {
+    const modal = document.getElementById('auth-modal');
+    if (modal) {
+        modal.classList.add('hidden');
+        document.body.style.overflow = 'auto'; // Restaurar scroll
+    }
+}
+
+async function handleLogin(e) {
+    e.preventDefault();
+    const btn = document.getElementById('btn-login');
+    const errorText = document.getElementById('login-error');
+    const username = document.getElementById('login-username').value;
+    const password = document.getElementById('login-password').value;
+    
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Conectando...';
+    errorText.classList.add('hidden');
+
+    try {
+        /* 
+         * AQUÍ VA TU LLAMADA AL BACKEND REAL (descomentar cuando el backend esté listo)
+         * const res = await fetch(`${API_BASE_URL}/api/login`, {
+         *     method: 'POST',
+         *     headers: { 'Content-Type': 'application/json' },
+         *     body: JSON.stringify({ username, password })
+         * });
+         * if (!res.ok) throw new Error('Credenciales inválidas');
+         * const data = await res.json();
+         * authToken = data.token;
+         */
+
+        // SIMULACIÓN DE LOGIN para el frontend:
+        await new Promise(resolve => setTimeout(resolve, 800)); 
+        authToken = 'token_simulado_' + username;
+        currentUsername = username;
+        
+        localStorage.setItem('auth_token', authToken);
+        localStorage.setItem('current_username', username);
+        
+        hideLoginModal();
+        initializeApp();
+    } catch (err) {
+        errorText.classList.remove('hidden');
+    } finally {
+        btn.disabled = false;
+        btn.innerHTML = 'Entrar <i class="fa-solid fa-arrow-right"></i>';
+    }
+}
+
+function handleLogout() {
+    localStorage.removeItem('auth_token');
+    localStorage.removeItem('current_username');
+    window.location.reload(); // Recargar limpia la interfaz y muestra el modal
+}
+
+// Envuelve las llamadas iniciales para ejecutarlas SÓLO tras iniciar sesión
+function initializeApp() {
+    fetchCurriculum();
+    setupSpeechRecognition();
+    fetchSRSStats();
+    fetchSRSDueWords();
+    // Encamenamos las estadísticas primero para asegurar que tenemos el NIVEL antes de pedir los desafíos
+    fetchUserStats().then(() => {
+        fetchProgressData();
+        fetchDailyChallenge();
+    });
+    initWaveform();
 }

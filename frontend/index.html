@@ -25,6 +25,32 @@
     </head>
     <body
         class="bg-slate-50 text-slate-900 font-sans min-h-screen flex flex-col dark:bg-slate-900 dark:text-slate-100 transition-colors duration-200">
+        <!-- Pantalla de Login (Overlay) -->
+        <div id="auth-modal" class="fixed inset-0 z-[100] flex items-center justify-center bg-slate-900/90 backdrop-blur-sm transition-opacity">
+            <div class="bg-white dark:bg-slate-800 p-8 rounded-2xl shadow-2xl w-full max-w-md border border-slate-200 dark:border-slate-700 mx-4">
+                <div class="text-center mb-6">
+                    <h2 class="text-3xl font-black text-indigo-600 dark:text-indigo-400 flex justify-center items-center gap-2">
+                        <i class="fa-solid fa-graduation-cap"></i> LinguaBoost
+                    </h2>
+                    <p class="text-slate-600 dark:text-slate-300 mt-2 font-medium">Inicia sesión en tu cuenta</p>
+                </div>
+                <form id="login-form" onsubmit="handleLogin(event)" class="space-y-4">
+                    <div>
+                        <label class="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-1">Usuario</label>
+                        <input type="text" id="login-username" required class="w-full p-3 rounded-xl border border-slate-300 dark:border-slate-600 bg-slate-50 dark:bg-slate-700 text-slate-800 dark:text-slate-100 focus:ring-2 focus:ring-indigo-500 focus:outline-none transition" placeholder="Ingresa tu usuario">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-1">Contraseña</label>
+                        <input type="password" id="login-password" required class="w-full p-3 rounded-xl border border-slate-300 dark:border-slate-600 bg-slate-50 dark:bg-slate-700 text-slate-800 dark:text-slate-100 focus:ring-2 focus:ring-indigo-500 focus:outline-none transition" placeholder="••••••••">
+                    </div>
+                    <button type="submit" id="btn-login" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3.5 rounded-xl shadow transition mt-2 flex justify-center items-center gap-2">
+                        Entrar <i class="fa-solid fa-arrow-right"></i>
+                    </button>
+                    <p id="login-error" class="hidden text-rose-500 text-sm text-center font-semibold mt-2">Error al iniciar sesión.</p>
+                </form>
+            </div>
+        </div>
+
         <!-- Header / Navbar con menú hamburguesa -->
         <header class="bg-indigo-600 dark:bg-indigo-900 text-white shadow-md">
             <div
@@ -56,6 +82,13 @@
                         class="text-white text-xl hover:text-indigo-200 transition p-1 rounded-lg focus:outline-none focus:ring-2 focus:ring-white/50"
                         aria-label="Cambiar Modo Oscuro">
                         <i class="fa-solid fa-moon"></i>
+                    </button>
+                    <button
+                        id="logout-btn"
+                        onclick="handleLogout()"
+                        class="text-white text-xl hover:text-rose-400 transition p-1 rounded-lg focus:outline-none"
+                        title="Cerrar Sesión">
+                        <i class="fa-solid fa-right-from-bracket"></i>
                     </button>
                 </div>
             </div>
