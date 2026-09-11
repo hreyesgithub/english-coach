@@ -3,9 +3,12 @@
 // ==========================================
 
 // Para pruebas locales
-//const API_BASE_URL = "http://127.0.0.1:8000"; 
+//const API_BASE_URL = "http://127.0.0.1:8000";
 // Para pruebas en Render
-const API_BASE_URL = "https://english-coach-ekm0.onrender.com";  
+const API_BASE_URL = "https://english-coach-ekm0.onrender.com";
+const SUPABASE_URL = "https://fybnnkzufbobktzuovba.supabase.co";
+const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZ5Ym5ua3p1ZmJvYmt0enVvdmJhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODkxMDUwNjIsImV4cCI6MjEwNDY4MTA2Mn0.efz0qnh-r6XwfgiO4pdx6tBwXU4_DLUOlkGDWa3rbPM";
+const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 // Estado global
 let curriculumData = {};
@@ -34,11 +37,11 @@ let ptState = {
     currentLevel: "A2",
     questionId: null,
     selectedOption: null,
-    history: []
+    history: [],
 };
 // Variable global para autenticación
-let authToken = localStorage.getItem('auth_token') || null;
-let currentUsername = localStorage.getItem('current_username') || null;
+let authToken = localStorage.getItem("auth_token") || null;
+let currentUsername = localStorage.getItem("current_username") || null;
 
 const LEVEL_ORDER = ["A1", "A2", "B1", "B2", "C1", "C2"];
 
@@ -52,7 +55,7 @@ const processing = {
     roleplay: false,
     placement: false,
     mission: false,
-    audio: false  // para playNaturalAudio
+    audio: false, // para playNaturalAudio
 };
 
 // --- 1. INICIALIZACIÓN ---
@@ -85,46 +88,54 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     // ----- Menú principal -----
-    const menuToggle = document.getElementById('menu-toggle');
-    const mainMenu = document.getElementById('main-menu');
+    const menuToggle = document.getElementById("menu-toggle");
+    const mainMenu = document.getElementById("main-menu");
 
-    menuToggle.addEventListener('click', (e) => {
+    menuToggle.addEventListener("click", (e) => {
         e.stopPropagation();
-        mainMenu.classList.toggle('hidden');
+        mainMenu.classList.toggle("hidden");
     });
 
-    document.querySelectorAll('#main-menu a[data-tab]').forEach(link => {
-        link.addEventListener('click', (e) => {
+    document.querySelectorAll("#main-menu a[data-tab]").forEach((link) => {
+        link.addEventListener("click", (e) => {
             e.preventDefault();
             const tab = link.dataset.tab;
             switchTab(tab);
-            mainMenu.classList.add('hidden');
+            mainMenu.classList.add("hidden");
         });
     });
 
-    document.addEventListener('click', (e) => {
-        if (!mainMenu.contains(e.target) && e.target !== menuToggle && !menuToggle.contains(e.target)) {
-            mainMenu.classList.add('hidden');
+    document.addEventListener("click", (e) => {
+        if (
+            !mainMenu.contains(e.target) &&
+            e.target !== menuToggle &&
+            !menuToggle.contains(e.target)
+        ) {
+            mainMenu.classList.add("hidden");
         }
     });
 });
 
 // --- MODO OSCURO ---
 function initDarkMode() {
-    const toggle = document.getElementById('dark-mode-toggle');
-    const isDark = localStorage.getItem('dark-mode') === 'true';
-    
+    const toggle = document.getElementById("dark-mode-toggle");
+    const isDark = localStorage.getItem("dark-mode") === "true";
+
     if (isDark) {
-        document.documentElement.classList.add('dark');
-        if (toggle) toggle.innerHTML = '<i class="fa-solid fa-sun text-amber-400"></i>';
+        document.documentElement.classList.add("dark");
+        if (toggle)
+            toggle.innerHTML = '<i class="fa-solid fa-sun text-amber-400"></i>';
     }
 
     if (toggle) {
-        toggle.addEventListener('click', () => {
-            document.documentElement.classList.toggle('dark');
-            const activeDark = document.documentElement.classList.contains('dark');
-            localStorage.setItem('dark-mode', activeDark);
-            toggle.innerHTML = activeDark ? '<i class="fa-solid fa-sun text-amber-400"></i>' : '<i class="fa-solid fa-moon"></i>';
+        toggle.addEventListener("click", () => {
+            document.documentElement.classList.toggle("dark");
+            const activeDark =
+                document.documentElement.classList.contains("dark");
+            localStorage.setItem("dark-mode", activeDark);
+            toggle.innerHTML = activeDark
+                ? '<i class="fa-solid fa-sun text-amber-400"></i>'
+                : '<i class="fa-solid fa-moon"></i>';
             if (progressChart) fetchProgressData();
         });
     }
@@ -132,8 +143,8 @@ function initDarkMode() {
 
 // --- WAVEFORM AUDIO VISUALIZER ---
 function initWaveform() {
-    waveformCanvas = document.getElementById('waveform');
-    if (waveformCanvas) waveformCtx = waveformCanvas.getContext('2d');
+    waveformCanvas = document.getElementById("waveform");
+    if (waveformCanvas) waveformCtx = waveformCanvas.getContext("2d");
 }
 
 async function startAudioVisualization(stream, canvas, ctx) {
@@ -156,22 +167,22 @@ function drawWaveform(canvas, ctx) {
     requestAnimationFrame(() => drawWaveform(canvas, ctx));
     analyser.getByteTimeDomainData(dataArray);
     ctx.clearRect(0, 0, canvas.width, canvas.height);
-    
-    const isDark = document.documentElement.classList.contains('dark');
-    ctx.fillStyle = isDark ? '#1e293b' : '#e2e8f0';
+
+    const isDark = document.documentElement.classList.contains("dark");
+    ctx.fillStyle = isDark ? "#1e293b" : "#e2e8f0";
     ctx.fillRect(0, 0, canvas.width, canvas.height);
-    
+
     ctx.lineWidth = 2;
-    ctx.strokeStyle = isDark ? '#818cf8' : '#4f46e5';
+    ctx.strokeStyle = isDark ? "#818cf8" : "#4f46e5";
     ctx.beginPath();
-    
+
     const bufferLength = dataArray.length;
     const sliceWidth = canvas.width / bufferLength;
     let x = 0;
-    
+
     for (let i = 0; i < bufferLength; i++) {
         const v = dataArray[i] / 128.0;
-        const y = v * canvas.height / 2;
+        const y = (v * canvas.height) / 2;
         if (i === 0) ctx.moveTo(x, y);
         else ctx.lineTo(x, y);
         x += sliceWidth;
@@ -182,32 +193,38 @@ function drawWaveform(canvas, ctx) {
 // --- ESTADÍSTICAS DEL USUARIO Y XP ---
 async function fetchUserStats() {
     try {
-        const res = await fetch(`${API_BASE_URL}/api/user/stats`);
+        const res = await conectarConServidorRender('/api/user/stats');
         if (!res.ok) return;
         const stats = await res.json();
         userStats = stats;
-        
-        document.getElementById('user-level').innerText = stats.level;
-        document.getElementById('user-xp').innerText = stats.xp;
-        document.getElementById('user-streak').innerText = stats.streak;
-        document.getElementById('user-badges').innerText = stats.badges.length;
-        document.getElementById('nav-user-level-badge').innerText = `Nivel: ${stats.level}`;
-    } catch (e) { console.error('Error al obtener estadisticas:', e); }
+
+        document.getElementById("user-level").innerText = stats.level;
+        document.getElementById("user-xp").innerText = stats.xp;
+        document.getElementById("user-streak").innerText = stats.streak;
+        document.getElementById("user-badges").innerText = stats.badges.length;
+        document.getElementById("nav-user-level-badge").innerText =
+            `Nivel: ${stats.level}`;
+    } catch (e) {
+        console.error("Error al obtener estadisticas:", e);
+    }
 }
 
 async function updateUserXP(xpGain) {
     try {
-        const res = await fetch(`${API_BASE_URL}/api/user/update-xp?xp_gain=${xpGain}`);
+        const res = await conectarConServidorRender('/api/user/update-xp?xp_gain=' + xpGain);
         if (res.ok) {
             await fetchUserStats();
             showXPPopup(xpGain);
         }
-    } catch (e) { console.error('Error al actualizar XP:', e); }
+    } catch (e) {
+        console.error("Error al actualizar XP:", e);
+    }
 }
 
 function showXPPopup(gain) {
-    const popup = document.createElement('div');
-    popup.className = 'fixed top-20 right-4 bg-emerald-700 text-white font-extrabold px-4 py-2 rounded-xl shadow-lg z-50 animate-bounce';
+    const popup = document.createElement("div");
+    popup.className =
+        "fixed top-20 right-4 bg-emerald-700 text-white font-extrabold px-4 py-2 rounded-xl shadow-lg z-50 animate-bounce";
     popup.innerText = `+${gain} XP`;
     document.body.appendChild(popup);
     setTimeout(() => popup.remove(), 2000);
@@ -216,63 +233,98 @@ function showXPPopup(gain) {
 // --- GRÁFICO DE PROGRESO ---
 async function fetchProgressData() {
     try {
-        const res = await fetch(`${API_BASE_URL}/api/user/progress?days=30`);
+        const res = await conectarConServidorRender('/api/user/progress?days=30');
         if (!res.ok) return;
         const data = await res.json();
-        const canvas = document.getElementById('progress-chart');
+        const canvas = document.getElementById("progress-chart");
         if (!canvas) return;
-        
-        const ctx = canvas.getContext('2d');
-        const isDark = document.documentElement.classList.contains('dark');
-        
+
+        const ctx = canvas.getContext("2d");
+        const isDark = document.documentElement.classList.contains("dark");
+
         if (progressChart) progressChart.destroy();
-        
+
         progressChart = new Chart(ctx, {
-            type: 'line',
+            type: "line",
             data: {
                 labels: data.dates,
                 datasets: [
-                    { label: 'XP', data: data.xp, borderColor: '#d97706', backgroundColor: '#d97706', tension: 0.2 },
-                    { label: 'Palabras', data: data.words, borderColor: '#2563eb', backgroundColor: '#2563eb', tension: 0.2 },
-                    { label: 'Roleplays', data: data.roleplays, borderColor: '#059669', backgroundColor: '#059669', tension: 0.2 }
-                ]
+                    {
+                        label: "XP",
+                        data: data.xp,
+                        borderColor: "#d97706",
+                        backgroundColor: "#d97706",
+                        tension: 0.2,
+                    },
+                    {
+                        label: "Palabras",
+                        data: data.words,
+                        borderColor: "#2563eb",
+                        backgroundColor: "#2563eb",
+                        tension: 0.2,
+                    },
+                    {
+                        label: "Roleplays",
+                        data: data.roleplays,
+                        borderColor: "#059669",
+                        backgroundColor: "#059669",
+                        tension: 0.2,
+                    },
+                ],
             },
             options: {
                 responsive: true,
                 maintainAspectRatio: false,
                 plugins: {
                     legend: {
-                        labels: { color: isDark ? '#e2e8f0' : '#1e293b', font: { weight: 'bold' } }
-                    }
+                        labels: {
+                            color: isDark ? "#e2e8f0" : "#1e293b",
+                            font: { weight: "bold" },
+                        },
+                    },
                 },
                 scales: {
-                    x: { ticks: { color: isDark ? '#94a3b8' : '#64748b' }, grid: { color: isDark ? '#334155' : '#e2e8f0' } },
-                    y: { beginAtZero: true, ticks: { color: isDark ? '#94a3b8' : '#64748b' }, grid: { color: isDark ? '#334155' : '#e2e8f0' } }
-                }
-            }
+                    x: {
+                        ticks: { color: isDark ? "#94a3b8" : "#64748b" },
+                        grid: { color: isDark ? "#334155" : "#e2e8f0" },
+                    },
+                    y: {
+                        beginAtZero: true,
+                        ticks: { color: isDark ? "#94a3b8" : "#64748b" },
+                        grid: { color: isDark ? "#334155" : "#e2e8f0" },
+                    },
+                },
+            },
         });
-    } catch (e) { console.error('Error cargando gráfico:', e); }
+    } catch (e) {
+        console.error("Error cargando gráfico:", e);
+    }
 }
 
 // --- DESAFÍO DIARIO ACORDE AL NIVEL ---
 async function fetchDailyChallenge() {
     try {
         // Obtenemos el nivel actual del usuario (por defecto A1 si está fallando)
-        const userLevel = userStats.level || 'A1';
-        
+        const userLevel = userStats.level || "A1";
+
         // Pasamos el nivel y el token como parámetros para que el backend devuelva desafíos personalizados
-        const res = await fetch(`${API_BASE_URL}/api/daily-challenge?level=${userLevel}`, {
-            headers: {
-                'Authorization': `Bearer ${authToken}` // Enviando token al backend
-            }
-        });
-        
+        const res = await fetch(
+            `${API_BASE_URL}/api/daily-challenge?level=${userLevel}`,
+            {
+                headers: {
+                    Authorization: `Bearer ${authToken}`, // Enviando token al backend
+                },
+            },
+        );
+
         if (!res.ok) return;
         const data = await res.json();
-        const container = document.getElementById('challenge-missions');
+        const container = document.getElementById("challenge-missions");
         if (!container) return;
 
-        container.innerHTML = data.missions.map(m => `
+        container.innerHTML = data.missions
+            .map(
+                (m) => `
             <div class="bg-slate-50 dark:bg-slate-700/60 p-4 rounded-xl border border-slate-200 dark:border-slate-600">
                 <div class="flex items-center justify-between mb-2">
                     <span class="text-sm font-bold text-amber-700 dark:text-amber-400">
@@ -282,8 +334,12 @@ async function fetchDailyChallenge() {
                 </div>
                 <p class="text-slate-800 dark:text-slate-100 font-medium">${m.text}</p>
             </div>
-        `).join('');
-    } catch (e) { console.error('Error en Desafío Diario:', e); }
+        `,
+            )
+            .join("");
+    } catch (e) {
+        console.error("Error en Desafío Diario:", e);
+    }
 }
 
 async function completeMission(missionId, btnElement) {
@@ -291,39 +347,45 @@ async function completeMission(missionId, btnElement) {
     processing.mission = true;
     if (btnElement) {
         btnElement.disabled = true;
-        btnElement.classList.add('opacity-50', 'cursor-not-allowed');
+        btnElement.classList.add("opacity-50", "cursor-not-allowed");
         btnElement.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i>';
     }
 
     try {
-        const res = await fetch(`${API_BASE_URL}/api/daily-challenge/complete?mission_id=${missionId}`, { method: 'POST' });
+        const res = await fetch(
+            `${API_BASE_URL}/api/daily-challenge/complete?mission_id=${missionId}`,
+            { headers: {
+                    Authorization: `Bearer ${authToken}`, // Enviando token al backend
+                },
+                method: "POST" },
+        );
         if (res.ok) {
             const data = await res.json();
             await Swal.fire({
-                icon: 'success',
-                title: '¡Misión completada!',
+                icon: "success",
+                title: "¡Misión completada!",
                 text: `+${data.xp_gained} XP`,
                 timer: 2000,
-                showConfirmButton: false
+                showConfirmButton: false,
             });
             await fetchUserStats();
         } else {
-            throw new Error('Error al completar misión');
+            throw new Error("Error al completar misión");
         }
     } catch (e) {
-        console.error('Error al completar misión:', e);
+        console.error("Error al completar misión:", e);
         Swal.fire({
-            icon: 'error',
-            title: 'Error',
-            text: 'No se pudo completar la misión. Intenta de nuevo.',
-            confirmButtonColor: '#4f46e5'
+            icon: "error",
+            title: "Error",
+            text: "No se pudo completar la misión. Intenta de nuevo.",
+            confirmButtonColor: "#4f46e5",
         });
     } finally {
         processing.mission = false;
         if (btnElement) {
             btnElement.disabled = false;
-            btnElement.classList.remove('opacity-50', 'cursor-not-allowed');
-            btnElement.innerHTML = 'Completar';
+            btnElement.classList.remove("opacity-50", "cursor-not-allowed");
+            btnElement.innerHTML = "Completar";
         }
     }
 }
@@ -334,9 +396,9 @@ async function fetchCurriculum() {
     const display = document.getElementById("text-display");
 
     try {
-        const res = await fetch(`${API_BASE_URL}/api/curriculum`);
+        const res = await conectarConServidorRender('/api/curriculum');
         if (!res.ok) throw new Error("Servidor no disponible");
-        
+
         curriculumData = await res.json();
         allUnitsMap = {};
         let selectHtml = "";
@@ -344,7 +406,7 @@ async function fetchCurriculum() {
 
         for (const [levelKey, levelObj] of Object.entries(curriculumData)) {
             selectHtml += `<optgroup label="${levelObj.level_name}">`;
-            levelObj.units.forEach(unit => {
+            levelObj.units.forEach((unit) => {
                 allUnitsMap[unit.id] = unit;
                 if (!firstUnitId) firstUnitId = unit.id;
                 selectHtml += `<option value="${unit.id}">${unit.title}</option>`;
@@ -392,13 +454,17 @@ function renderCurrentUnit() {
             <p class="text-slate-800 dark:text-slate-100 text-lg leading-relaxed font-medium">${currentUnit.text}</p>
             <div class="mt-4 pt-3 border-t border-slate-200 dark:border-slate-700 flex flex-wrap items-center gap-1.5 text-xs text-slate-600 dark:text-slate-300">
                 <strong class="text-slate-800 dark:text-slate-200">Vocabulario clave:</strong> 
-                ${currentUnit.vocabulary.map(v => `
+                ${currentUnit.vocabulary
+                    .map(
+                        (v) => `
                     <span class="bg-slate-100 dark:bg-slate-700 text-slate-800 dark:text-slate-200 px-2 py-0.5 rounded border border-slate-300 dark:border-slate-600 cursor-pointer hover:bg-indigo-600 hover:text-white dark:hover:bg-indigo-600 dark:hover:text-white transition font-medium" 
                           onclick="playNaturalAudio('${v}')" 
                           title="Escuchar pronunciación">
                         ${v}
                     </span>
-                `).join("")}
+                `,
+                    )
+                    .join("")}
             </div>
         `;
     }
@@ -414,15 +480,23 @@ function playNaturalAudio(text, voice = "en-US-AriaNeural") {
     const audioUrl = `${API_BASE_URL}/api/tts-natural?text=${encodeURIComponent(text)}&voice=${voice}`;
     const audio = new Audio(audioUrl);
 
-    audio.onended = () => { processing.audio = false; };
-    audio.onerror = () => { processing.audio = false; };
+    audio.onended = () => {
+        processing.audio = false;
+    };
+    audio.onerror = () => {
+        processing.audio = false;
+    };
 
     audio.play().catch(() => {
         window.speechSynthesis.cancel();
         const utterance = new SpeechSynthesisUtterance(text);
         utterance.lang = "en-US";
-        utterance.onend = () => { processing.audio = false; };
-        utterance.onerror = () => { processing.audio = false; };
+        utterance.onend = () => {
+            processing.audio = false;
+        };
+        utterance.onerror = () => {
+            processing.audio = false;
+        };
         window.speechSynthesis.speak(utterance);
     });
 }
@@ -433,7 +507,8 @@ function playTargetAudio() {
 
 // --- RECONOCIMIENTO Y EVALUACIÓN DE PRONUNCIACIÓN ---
 function setupSpeechRecognition() {
-    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    const SpeechRecognition =
+        window.SpeechRecognition || window.webkitSpeechRecognition;
     if (!SpeechRecognition) return;
 
     recognition = new SpeechRecognition();
@@ -457,66 +532,76 @@ function toggleRecording() {
 async function startRecording() {
     if (processing.recording) return;
     processing.recording = true;
-    const btn = document.getElementById('btn-record');
-    const textSpan = document.getElementById('record-text');
+    const btn = document.getElementById("btn-record");
+    const textSpan = document.getElementById("record-text");
     btn.disabled = true;
-    btn.classList.add('opacity-50', 'cursor-not-allowed');
-    textSpan.innerText = 'Grabando...';
+    btn.classList.add("opacity-50", "cursor-not-allowed");
+    textSpan.innerText = "Grabando...";
 
     try {
         if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
             await Swal.fire({
-                icon: 'error',
-                title: 'Navegador no compatible',
-                text: 'Tu navegador no soporta entrada de audio.',
-                confirmButtonColor: '#4f46e5'
+                icon: "error",
+                title: "Navegador no compatible",
+                text: "Tu navegador no soporta entrada de audio.",
+                confirmButtonColor: "#4f46e5",
             });
             return;
         }
-        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        const stream = await navigator.mediaDevices.getUserMedia({
+            audio: true,
+        });
         mediaRecorder = new MediaRecorder(stream);
         recordedChunks = [];
-        
-        mediaRecorder.ondataavailable = e => recordedChunks.push(e.data);
+
+        mediaRecorder.ondataavailable = (e) => recordedChunks.push(e.data);
         mediaRecorder.onstop = async () => {
-            const blob = new Blob(recordedChunks, { type: 'audio/wav' });
+            const blob = new Blob(recordedChunks, { type: "audio/wav" });
             const formData = new FormData();
-            formData.append('audio_file', blob, 'recording.wav');
-            formData.append('target_text', currentUnit ? currentUnit.text : '');
-            
+            formData.append("audio_file", blob, "recording.wav");
+            formData.append("target_text", currentUnit ? currentUnit.text : "");
+
             try {
-                const res = await fetch(`${API_BASE_URL}/api/evaluate-reading`, {
-                    method: 'POST',
-                    body: formData
-                });
+                const res = await fetch(
+                    `${API_BASE_URL}/api/evaluate-reading`,
+                    {
+                        headers: {
+                            Authorization: `Bearer ${authToken}`, // Enviando token al backend
+                        },
+                        method: "POST",
+                        body: formData,
+                    },
+                );
                 if (res.ok) {
                     const data = await res.json();
                     displayReadingResults(data);
                     updateUserXP(5);
                 }
-            } catch (e) { console.error('Error al evaluar audio:', e); }
+            } catch (e) {
+                console.error("Error al evaluar audio:", e);
+            }
         };
-        
+
         mediaRecorder.start();
         isRecording = true;
         textSpan.innerText = "Detener y Evaluar";
-        btn.classList.replace('bg-rose-600', 'bg-slate-800');
+        btn.classList.replace("bg-rose-600", "bg-slate-800");
         await startAudioVisualization(stream, waveformCanvas, waveformCtx);
     } catch (e) {
         console.error(e);
         Swal.fire({
-            icon: 'error',
-            title: 'Activación de micrófono',
-            text: 'No se pudo activar el micrófono.',
-            confirmButtonColor: '#4f46e5'
+            icon: "error",
+            title: "Activación de micrófono",
+            text: "No se pudo activar el micrófono.",
+            confirmButtonColor: "#4f46e5",
         });
     } finally {
         processing.recording = false;
         btn.disabled = false;
-        btn.classList.remove('opacity-50', 'cursor-not-allowed');
+        btn.classList.remove("opacity-50", "cursor-not-allowed");
         if (!isRecording) {
             textSpan.innerText = "Empezar a Grabar";
-            btn.classList.replace('bg-slate-800', 'bg-rose-600');
+            btn.classList.replace("bg-slate-800", "bg-rose-600");
         }
     }
 }
@@ -525,13 +610,16 @@ function stopRecording() {
     if (mediaRecorder && isRecording) {
         mediaRecorder.stop();
         isRecording = false;
-        document.getElementById('record-text').innerText = "Empezar a Grabar";
-        document.getElementById('btn-record').classList.replace('bg-slate-800', 'bg-rose-600');
-        if (mediaRecorder.stream) mediaRecorder.stream.getTracks().forEach(t => t.stop());
+        document.getElementById("record-text").innerText = "Empezar a Grabar";
+        document
+            .getElementById("btn-record")
+            .classList.replace("bg-slate-800", "bg-rose-600");
+        if (mediaRecorder.stream)
+            mediaRecorder.stream.getTracks().forEach((t) => t.stop());
         // Restaurar botón si no se hizo en finally (por si startRecording no terminó)
-        const btn = document.getElementById('btn-record');
+        const btn = document.getElementById("btn-record");
         btn.disabled = false;
-        btn.classList.remove('opacity-50', 'cursor-not-allowed');
+        btn.classList.remove("opacity-50", "cursor-not-allowed");
         processing.recording = false;
     }
 }
@@ -541,15 +629,20 @@ async function evaluatePronunciation(spokenText) {
     try {
         const response = await fetch(`${API_BASE_URL}/api/evaluate-reading`, {
             method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ target_text: currentUnit.text, spoken_text: spokenText })
+            headers: { Authorization: `Bearer ${authToken}`,"Content-Type": "application/json" },
+            body: JSON.stringify({
+                target_text: currentUnit.text,
+                spoken_text: spokenText,
+            }),
         });
         if (response.ok) {
             const data = await response.json();
             displayReadingResults(data);
             updateUserXP(5);
         }
-    } catch (err) { console.error(err); }
+    } catch (err) {
+        console.error(err);
+    }
 }
 
 function displayReadingResults(data) {
@@ -562,19 +655,21 @@ function displayReadingResults(data) {
     container.classList.remove("hidden");
     scoreText.innerText = `Precisión: ${data.accuracy_score}%`;
 
-    annotatedText.innerHTML = data.word_analysis.map(item => {
-        if (item.status === "correct") {
-            return `<span class="correct text-emerald-600 dark:text-emerald-400 font-bold mr-1.5">${item.word}</span>`;
-        } else {
-            return `
+    annotatedText.innerHTML = data.word_analysis
+        .map((item) => {
+            if (item.status === "correct") {
+                return `<span class="correct text-emerald-600 dark:text-emerald-400 font-bold mr-1.5">${item.word}</span>`;
+            } else {
+                return `
                 <span class="inline-flex flex-col items-center bg-rose-50 dark:bg-rose-950/50 px-2 py-1 rounded border border-rose-200 dark:border-rose-800/60 cursor-pointer mx-1 my-1 hover:bg-rose-100 dark:hover:bg-rose-900/60 transition" 
                       onclick="playNaturalAudio('${item.word}')" 
                       title="Escuchar pronunciación correcta">
                     <span class="text-rose-700 dark:text-rose-300 font-bold underline decoration-rose-400">${item.word}</span>
                     <span class="text-[11px] text-slate-600 dark:text-slate-400 font-mono font-medium">${item.ipa}</span>
                 </span>`;
-        }
-    }).join(" ");
+            }
+        })
+        .join(" ");
 }
 
 // --- DICTADO & LISTENING ---
@@ -585,26 +680,37 @@ function playDictationAudio() {
 async function checkDictation() {
     if (processing.dictation) return;
     processing.dictation = true;
-    const btn = document.getElementById('btn-check-dictation');
+    const btn = document.getElementById("btn-check-dictation");
     btn.disabled = true;
-    btn.classList.add('opacity-50', 'cursor-not-allowed');
-    btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Comprobando...';
+    btn.classList.add("opacity-50", "cursor-not-allowed");
+    btn.innerHTML =
+        '<i class="fa-solid fa-spinner fa-spin"></i> Comprobando...';
 
     try {
         if (!currentUnit) return;
-        const userInput = document.getElementById("dictation-input").value.trim().toLowerCase().replace(/[^\w\s]/g, "");
-        const targetText = currentUnit.text.trim().toLowerCase().replace(/[^\w\s]/g, "");
+        const userInput = document
+            .getElementById("dictation-input")
+            .value.trim()
+            .toLowerCase()
+            .replace(/[^\w\s]/g, "");
+        const targetText = currentUnit.text
+            .trim()
+            .toLowerCase()
+            .replace(/[^\w\s]/g, "");
         const feedback = document.getElementById("dictation-feedback");
 
         if (!feedback) return;
         feedback.classList.remove("hidden");
 
         if (userInput === targetText) {
-            feedback.className = "mt-4 p-4 rounded-xl bg-emerald-50 dark:bg-emerald-950/50 text-emerald-900 dark:text-emerald-200 font-bold border border-emerald-200 dark:border-emerald-800";
-            feedback.innerText = "🎉 ¡Perfecto! Escribiste la frase con total exactitud.";
+            feedback.className =
+                "mt-4 p-4 rounded-xl bg-emerald-50 dark:bg-emerald-950/50 text-emerald-900 dark:text-emerald-200 font-bold border border-emerald-200 dark:border-emerald-800";
+            feedback.innerText =
+                "🎉 ¡Perfecto! Escribiste la frase con total exactitud.";
             updateUserXP(10);
         } else {
-            feedback.className = "mt-4 p-4 rounded-xl bg-amber-50 dark:bg-amber-950/50 text-amber-900 dark:text-amber-200 border border-amber-200 dark:border-amber-800";
+            feedback.className =
+                "mt-4 p-4 rounded-xl bg-amber-50 dark:bg-amber-950/50 text-amber-900 dark:text-amber-200 border border-amber-200 dark:border-amber-800";
             feedback.innerHTML = `
                 <p class="font-bold mb-1.5 text-amber-900 dark:text-amber-200">Casi lo logras. Compara lo que escribiste:</p>
                 <p class="text-sm text-slate-700 dark:text-slate-300 mb-2"><strong>Tu respuesta:</strong> <span class="bg-white dark:bg-slate-800 px-2 py-0.5 rounded border border-amber-300 dark:border-amber-700 font-mono">${userInput || "(vacío)"}</span></p>
@@ -613,12 +719,16 @@ async function checkDictation() {
         }
     } catch (e) {
         console.error(e);
-        Swal.fire({ icon: 'error', title: 'Error', text: 'No se pudo verificar el dictado.' });
+        Swal.fire({
+            icon: "error",
+            title: "Error",
+            text: "No se pudo verificar el dictado.",
+        });
     } finally {
         processing.dictation = false;
         btn.disabled = false;
-        btn.classList.remove('opacity-50', 'cursor-not-allowed');
-        btn.innerHTML = 'Comprobar Dictado';
+        btn.classList.remove("opacity-50", "cursor-not-allowed");
+        btn.innerHTML = "Comprobar Dictado";
     }
 }
 
@@ -631,9 +741,9 @@ async function analyzeWriting(e) {
     if (processing.writing) return;
     processing.writing = true;
 
-    const btn = document.getElementById('btn-analyze-writing');
+    const btn = document.getElementById("btn-analyze-writing");
     btn.disabled = true;
-    btn.classList.add('opacity-50', 'cursor-not-allowed');
+    btn.classList.add("opacity-50", "cursor-not-allowed");
     btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Analizando...';
 
     try {
@@ -644,10 +754,10 @@ async function analyzeWriting(e) {
         const text = input.value.trim();
         if (!text) {
             await Swal.fire({
-                icon: 'warning',
-                title: 'Texto vacío',
-                text: 'Escribe o pega un texto en inglés.',
-                confirmButtonColor: '#4f46e5'
+                icon: "warning",
+                title: "Texto vacío",
+                text: "Escribe o pega un texto en inglés.",
+                confirmButtonColor: "#4f46e5",
             });
             return;
         }
@@ -660,8 +770,8 @@ async function analyzeWriting(e) {
 
         const response = await fetch(`${API_BASE_URL}/api/check-writing`, {
             method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ text })
+            headers: { Authorization: `Bearer ${authToken}`, "Content-Type": "application/json" },
+            body: JSON.stringify({ text }),
         });
 
         if (!response.ok) throw new Error(`HTTP Error ${response.status}`);
@@ -681,7 +791,7 @@ async function analyzeWriting(e) {
                 </div>`;
         } else {
             html += `<ul class="space-y-3">`;
-            data.feedback.forEach(item => {
+            data.feedback.forEach((item) => {
                 html += `
                     <li class="p-4 bg-rose-50 dark:bg-rose-950/40 border-l-4 border-rose-500 text-sm rounded-r-xl shadow-sm">
                         <strong class="text-rose-800 dark:text-rose-300 font-bold">${item.short_message}:</strong> 
@@ -701,12 +811,16 @@ async function analyzeWriting(e) {
                     ⚠️ Ocurrió un error al conectar con el servidor.
                 </div>`;
         }
-        Swal.fire({ icon: 'error', title: 'Error', text: 'No se pudo analizar el texto.' });
+        Swal.fire({
+            icon: "error",
+            title: "Error",
+            text: "No se pudo analizar el texto.",
+        });
     } finally {
         processing.writing = false;
         btn.disabled = false;
-        btn.classList.remove('opacity-50', 'cursor-not-allowed');
-        btn.innerHTML = 'Analizar Gramática';
+        btn.classList.remove("opacity-50", "cursor-not-allowed");
+        btn.innerHTML = "Analizar Gramática";
     }
 }
 
@@ -714,20 +828,23 @@ async function analyzeWriting(e) {
 function startShadowingRoutine() {
     if (processing.shadowing) return;
     processing.shadowing = true;
-    const btn = document.getElementById('btn-shadowing');
+    const btn = document.getElementById("btn-shadowing");
     btn.disabled = true;
-    btn.classList.add('opacity-50', 'cursor-not-allowed');
-    btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Reproduciendo...';
+    btn.classList.add("opacity-50", "cursor-not-allowed");
+    btn.innerHTML =
+        '<i class="fa-solid fa-spinner fa-spin"></i> Reproduciendo...';
 
     try {
         if (!currentUnit) return;
-        const sentences = currentUnit.text.match(/[^.!?]+[.!?]+/g) || [currentUnit.text];
+        const sentences = currentUnit.text.match(/[^.!?]+[.!?]+/g) || [
+            currentUnit.text,
+        ];
         let index = 0;
 
         function playNextSentence() {
             if (index < sentences.length) {
                 const current = sentences[index].trim();
-                const display = document.getElementById('shadowing-display');
+                const display = document.getElementById("shadowing-display");
                 if (display) display.innerText = current;
                 playNaturalAudio(current);
                 index++;
@@ -736,8 +853,9 @@ function startShadowingRoutine() {
                 // Restaurar botón al finalizar
                 processing.shadowing = false;
                 btn.disabled = false;
-                btn.classList.remove('opacity-50', 'cursor-not-allowed');
-                btn.innerHTML = '<i class="fa-solid fa-play"></i> Iniciar Rutina de Shadowing';
+                btn.classList.remove("opacity-50", "cursor-not-allowed");
+                btn.innerHTML =
+                    '<i class="fa-solid fa-play"></i> Iniciar Rutina de Shadowing';
             }
         }
         playNextSentence();
@@ -745,15 +863,17 @@ function startShadowingRoutine() {
         console.error(e);
         processing.shadowing = false;
         btn.disabled = false;
-        btn.classList.remove('opacity-50', 'cursor-not-allowed');
-        btn.innerHTML = '<i class="fa-solid fa-play"></i> Iniciar Rutina de Shadowing';
+        btn.classList.remove("opacity-50", "cursor-not-allowed");
+        btn.innerHTML =
+            '<i class="fa-solid fa-play"></i> Iniciar Rutina de Shadowing';
     }
 }
 
 // --- REPETICIÓN ESPACIADA (SRS) ---
 async function fetchSRSStats() {
     try {
-        const res = await fetch(`${API_BASE_URL}/api/srs/stats`);
+        const res = await conectarConServidorRender('/api/srs/stats');
+
         if (!res.ok) return;
         const stats = await res.json();
         const badge = document.getElementById("srs-badge");
@@ -766,18 +886,39 @@ async function fetchSRSStats() {
                 badge.classList.add("hidden");
             }
         }
-    } catch (err) { console.error("Error SRS stats:", err); }
+    } catch (err) {
+        console.error("Error SRS stats:", err);
+    }
 }
 
 async function fetchSRSDueWords() {
     try {
-        const res = await fetch(`${API_BASE_URL}/api/srs/due-words`);
+        const res = await conectarConServidorRender('/api/srs/due-words');
+
         if (!res.ok) return;
         const data = await res.json();
         srsDueWords = data.due_words;
         currentSRSIndex = 0;
         renderSRSCard();
-    } catch (err) { console.error("Error SRS words:", err); }
+    } catch (err) {
+        console.error("Error SRS words:", err);
+    }
+}
+
+async function conectarConServidorRender(endpoint){
+    console.warn("Conectando con el backend API:", authToken);
+    return await fetch(`${API_BASE_URL}${endpoint}`, {
+            method: "GET",
+            headers: { Authorization: `Bearer ${authToken}` },
+        }).then((response) => {
+            if (response.status === 401) {
+                console.error(
+                    "Sesión expirada o no autorizada. Redirigiendo a login...",
+                );
+                // Opcional: redirigir a pantalla de login
+            }
+            return response.json();
+        });
 }
 
 function renderSRSCard() {
@@ -811,17 +952,20 @@ function playSRSWordAudio() {
 async function submitSRSReview(success) {
     if (processing.srs) return;
     processing.srs = true;
-    const btnNo = document.getElementById('btn-srs-no');
-    const btnYes = document.getElementById('btn-srs-yes');
-    [btnNo, btnYes].forEach(b => { b.disabled = true; b.classList.add('opacity-50', 'cursor-not-allowed'); });
+    const btnNo = document.getElementById("btn-srs-no");
+    const btnYes = document.getElementById("btn-srs-yes");
+    [btnNo, btnYes].forEach((b) => {
+        b.disabled = true;
+        b.classList.add("opacity-50", "cursor-not-allowed");
+    });
 
     try {
         if (srsDueWords.length === 0 || !srsDueWords[currentSRSIndex]) return;
         const currentCard = srsDueWords[currentSRSIndex];
         const res = await fetch(`${API_BASE_URL}/api/srs/review`, {
             method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ word: currentCard.word, success })
+            headers: {  Authorization: `Bearer ${authToken}`, "Content-Type": "application/json" },
+            body: JSON.stringify({ word: currentCard.word, success }),
         });
         if (res.ok) {
             currentSRSIndex++;
@@ -829,54 +973,73 @@ async function submitSRSReview(success) {
             fetchSRSStats();
             if (success) updateUserXP(10);
         } else {
-            throw new Error('Error al enviar revisión');
+            throw new Error("Error al enviar revisión");
         }
     } catch (err) {
         console.error("Error SRS review:", err);
-        Swal.fire({ icon: 'error', title: 'Error', text: 'No se pudo registrar la revisión.' });
+        Swal.fire({
+            icon: "error",
+            title: "Error",
+            text: "No se pudo registrar la revisión.",
+        });
     } finally {
         processing.srs = false;
-        [btnNo, btnYes].forEach(b => { b.disabled = false; b.classList.remove('opacity-50', 'cursor-not-allowed'); });
+        [btnNo, btnYes].forEach((b) => {
+            b.disabled = false;
+            b.classList.remove("opacity-50", "cursor-not-allowed");
+        });
     }
 }
 
 // --- IPA MATRIZ FONÉTICA ---
 async function fetchIPAMatrix() {
     try {
-        const res = await fetch(`${API_BASE_URL}/api/ipa-matrix`);
+        const res = await conectarConServidorRender('/api/ipa-matrix');
+
         if (!res.ok) return;
         const data = await res.json();
 
         renderPhonemeCategory("vowels-grid", data.vowels);
         renderPhonemeCategory("diphthongs-grid", data.diphthongs);
         renderPhonemeCategory("consonants-grid", data.consonants);
-    } catch (err) { console.error("Error IPA:", err); }
+    } catch (err) {
+        console.error("Error IPA:", err);
+    }
 }
 
 const IPA_TYPE_COLORS = {
-    "Long Vowel": "bg-cyan-100 text-cyan-800 dark:bg-cyan-900/50 dark:text-cyan-300",
-    "Short Vowel": "bg-sky-100 text-sky-800 dark:bg-sky-900/50 dark:text-sky-300",
-    "Schwa": "bg-slate-200 text-slate-700 dark:bg-slate-700 dark:text-slate-300",
-    "Diphthong": "bg-purple-100 text-purple-800 dark:bg-purple-900/50 dark:text-purple-300",
-    "Voiced": "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/50 dark:text-emerald-300",
-    "Unvoiced": "bg-amber-100 text-amber-800 dark:bg-amber-900/50 dark:text-amber-300",
-    "Nasal": "bg-rose-100 text-rose-800 dark:bg-rose-900/50 dark:text-rose-300",
-    "Approximant": "bg-indigo-100 text-indigo-800 dark:bg-indigo-900/50 dark:text-indigo-300",
+    "Long Vowel":
+        "bg-cyan-100 text-cyan-800 dark:bg-cyan-900/50 dark:text-cyan-300",
+    "Short Vowel":
+        "bg-sky-100 text-sky-800 dark:bg-sky-900/50 dark:text-sky-300",
+    Schwa: "bg-slate-200 text-slate-700 dark:bg-slate-700 dark:text-slate-300",
+    Diphthong:
+        "bg-purple-100 text-purple-800 dark:bg-purple-900/50 dark:text-purple-300",
+    Voiced: "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/50 dark:text-emerald-300",
+    Unvoiced:
+        "bg-amber-100 text-amber-800 dark:bg-amber-900/50 dark:text-amber-300",
+    Nasal: "bg-rose-100 text-rose-800 dark:bg-rose-900/50 dark:text-rose-300",
+    Approximant:
+        "bg-indigo-100 text-indigo-800 dark:bg-indigo-900/50 dark:text-indigo-300",
 };
-const IPA_TYPE_DEFAULT_COLOR = "bg-slate-100 text-slate-700 dark:bg-slate-700 dark:text-slate-300";
+const IPA_TYPE_DEFAULT_COLOR =
+    "bg-slate-100 text-slate-700 dark:bg-slate-700 dark:text-slate-300";
 
 function renderPhonemeCategory(containerId, items) {
-  const grid = document.getElementById(containerId);
-  if (!grid) return;
+    const grid = document.getElementById(containerId);
+    if (!grid) return;
 
-  grid.innerHTML = items.map((item, index) => {
-    const truncate = (str, max) => str.length > max ? str.slice(0, max) + '…' : str;
-    const shortHint = truncate(item.spanish_equivalent_or_hack, 300);
-    const shortError = truncate(item.common_error_spanish, 300);
+    grid.innerHTML = items
+        .map((item, index) => {
+            const truncate = (str, max) =>
+                str.length > max ? str.slice(0, max) + "…" : str;
+            const shortHint = truncate(item.spanish_equivalent_or_hack, 300);
+            const shortError = truncate(item.common_error_spanish, 300);
 
-    const typeColor = IPA_TYPE_COLORS[item.type] || IPA_TYPE_DEFAULT_COLOR;
+            const typeColor =
+                IPA_TYPE_COLORS[item.type] || IPA_TYPE_DEFAULT_COLOR;
 
-    return `
+            return `
       <div class="phoneme-card group bg-white dark:bg-slate-800 rounded-2xl shadow-sm hover:shadow-lg border border-slate-200 dark:border-slate-700 hover:border-cyan-400 dark:hover:border-cyan-500 transition-all duration-200 p-4 cursor-pointer"
            data-index="${index}"
            onclick="playNaturalAudio('${item.example}')">
@@ -890,15 +1053,18 @@ function renderPhonemeCategory(containerId, items) {
         <div class="mt-1 text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider ">${item.type}</div>
 
         <div class="mt-3 flex flex-wrap gap-1.5">
-          ${item.common_spellings.map(sp => 
-            `<span class="px-2.5 py-0.5 bg-cyan-100 dark:bg-cyan-900/40 text-cyan-800 dark:text-cyan-300 text-[11px] rounded-full font-mono border border-cyan-200 dark:border-cyan-800">${sp}</span>`
-          ).join('')}
+          ${item.common_spellings
+              .map(
+                  (sp) =>
+                      `<span class="px-2.5 py-0.5 bg-cyan-100 dark:bg-cyan-900/40 text-cyan-800 dark:text-cyan-300 text-[11px] rounded-full font-mono border border-cyan-200 dark:border-cyan-800">${sp}</span>`,
+              )
+              .join("")}
         </div>
 
         <div class="mt-3 text-xs text-slate-600 dark:text-slate-300">
           <i class="fa-solid fa-arrows-rotate text-slate-500 dark:text-slate-400 text-xs mr-1"></i>
           <span class="font-semibold">Contrasta con:</span>
-          <span class="ml-1">${item.minimal_pairs.join(' · ')}</span>
+          <span class="ml-1">${item.minimal_pairs.join(" · ")}</span>
         </div>
 
         <div class="mt-2 text-xs text-slate-600 dark:text-slate-300 italic line-clamp-2">
@@ -930,55 +1096,63 @@ function renderPhonemeCategory(containerId, items) {
           </div>
           <div>
             <i class="fa-regular fa-pen-to-square text-slate-500 dark:text-slate-400 text-xs w-4"></i>
-            <span class="font-semibold">Grafías:</span> ${item.common_spellings.join(', ')}
+            <span class="font-semibold">Grafías:</span> ${item.common_spellings.join(", ")}
           </div>
           <div>
             <i class="fa-solid fa-rotate-right text-slate-500 dark:text-slate-400 text-xs w-4"></i>
-            <span class="font-semibold">Pares mínimos:</span> ${item.minimal_pairs.join('; ')}
+            <span class="font-semibold">Pares mínimos:</span> ${item.minimal_pairs.join("; ")}
           </div>
         </div>
       </div>
     `;
-  }).join("");
+        })
+        .join("");
 
-  window.toggleDetails = function(btn, index) {
-    const details = document.getElementById(`details-${index}`);
-    if (details) {
-      const isHidden = details.classList.contains('hidden');
-      details.classList.toggle('hidden');
-      const textSpan = btn.querySelector('.btn-toggle-text');
-      const icon = btn.querySelector('i');
-      if (textSpan) {
-        textSpan.textContent = isHidden ? 'Ver menos' : 'Ver más';
-      }
-      if (icon) {
-        icon.className = isHidden 
-          ? 'fa-regular fa-book text-cyan-600 dark:text-cyan-400 text-xs' 
-          : 'fa-regular fa-book-open text-cyan-600 dark:text-cyan-400 text-xs';
-      }
-    }
-  };
+    window.toggleDetails = function (btn, index) {
+        const details = document.getElementById(`details-${index}`);
+        if (details) {
+            const isHidden = details.classList.contains("hidden");
+            details.classList.toggle("hidden");
+            const textSpan = btn.querySelector(".btn-toggle-text");
+            const icon = btn.querySelector("i");
+            if (textSpan) {
+                textSpan.textContent = isHidden ? "Ver menos" : "Ver más";
+            }
+            if (icon) {
+                icon.className = isHidden
+                    ? "fa-regular fa-book text-cyan-600 dark:text-cyan-400 text-xs"
+                    : "fa-regular fa-book-open text-cyan-600 dark:text-cyan-400 text-xs";
+            }
+        }
+    };
 }
 
 // --- ROLEPLAY MODULO ---
 async function initRoleplayModule() {
     try {
-        const res = await fetch(`${API_BASE_URL}/api/roleplay/scenarios`);
+        const res = await conectarConServidorRender('/api/roleplay/scenarios');
+   
         if (!res.ok) return;
         const scenarios = await res.json();
-        
+
         roleplayScenariosMap = {};
-        scenarios.forEach(sc => { roleplayScenariosMap[sc.id] = sc; });
-        
+        scenarios.forEach((sc) => {
+            roleplayScenariosMap[sc.id] = sc;
+        });
+
         renderScenariosGrid(scenarios);
-    } catch (err) { console.error("Error Roleplay:", err); }
+    } catch (err) {
+        console.error("Error Roleplay:", err);
+    }
 }
 
 function renderScenariosGrid(scenarios) {
     const grid = document.getElementById("roleplay-scenarios-grid");
     if (!grid) return;
 
-    grid.innerHTML = scenarios.map(sc => `
+    grid.innerHTML = scenarios
+        .map(
+            (sc) => `
         <div onclick="startRoleplaySession('${sc.id}')" 
              class="p-5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl hover:border-indigo-500 dark:hover:border-indigo-400 hover:shadow-md cursor-pointer transition flex flex-col justify-between">
             <div>
@@ -992,7 +1166,9 @@ function renderScenariosGrid(scenarios) {
                 Iniciar práctica <i class="fa-solid fa-arrow-right"></i>
             </span>
         </div>
-    `).join("");
+    `,
+        )
+        .join("");
 }
 
 function startRoleplaySession(scenarioId) {
@@ -1004,11 +1180,12 @@ function startRoleplaySession(scenarioId) {
     document.getElementById("roleplay-scenarios-grid").classList.add("hidden");
     document.getElementById("roleplay-chat-box").classList.remove("hidden");
     document.getElementById("rp-active-title").innerText = sc.title;
-    document.getElementById("rp-active-role").innerText = `Interlocutor: ${sc.role}`;
-    
+    document.getElementById("rp-active-role").innerText =
+        `Interlocutor: ${sc.role}`;
+
     const messagesContainer = document.getElementById("rp-messages");
     messagesContainer.innerHTML = "";
-    
+
     appendRPMessage("bot", sc.initial_message);
     playNaturalAudio(sc.initial_message);
     renderRPSuggestions(sc.suggested_replies);
@@ -1016,7 +1193,9 @@ function startRoleplaySession(scenarioId) {
 }
 
 function closeRoleplayChat() {
-    document.getElementById("roleplay-scenarios-grid").classList.remove("hidden");
+    document
+        .getElementById("roleplay-scenarios-grid")
+        .classList.remove("hidden");
     document.getElementById("roleplay-chat-box").classList.add("hidden");
     currentScenario = null;
 }
@@ -1027,11 +1206,11 @@ function appendRPMessage(sender, text, feedback = null) {
 
     const isBot = sender === "bot";
     const msgHtml = `
-        <div class="flex flex-col ${isBot ? 'items-start' : 'items-end'}">
-            <div class="max-w-[80%] p-4 rounded-2xl ${isBot ? 'bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-100' : 'bg-indigo-600 text-white'} shadow-sm">
+        <div class="flex flex-col ${isBot ? "items-start" : "items-end"}">
+            <div class="max-w-[80%] p-4 rounded-2xl ${isBot ? "bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-100" : "bg-indigo-600 text-white"} shadow-sm">
                 <p class="text-sm font-medium">${text}</p>
             </div>
-            ${feedback ? `<span class="text-[11px] text-amber-700 dark:text-amber-400 mt-1 font-semibold flex items-center gap-1"><i class="fa-solid fa-lightbulb"></i> ${feedback}</span>` : ''}
+            ${feedback ? `<span class="text-[11px] text-amber-700 dark:text-amber-400 mt-1 font-semibold flex items-center gap-1"><i class="fa-solid fa-lightbulb"></i> ${feedback}</span>` : ""}
         </div>
     `;
 
@@ -1050,7 +1229,9 @@ function renderRPSuggestions(replies) {
     }
 
     box.classList.remove("hidden");
-    box.innerHTML = replies.map(r => `
+    box.innerHTML = replies
+        .map(
+            (r) => `
         <button 
             type="button" 
             data-reply="${encodeURIComponent(r)}"
@@ -1059,7 +1240,9 @@ function renderRPSuggestions(replies) {
         >
             💡 "${r}"
         </button>
-    `).join("");
+    `,
+        )
+        .join("");
 }
 
 function useRPSuggestionFromData(btnEl, e) {
@@ -1081,13 +1264,14 @@ function toggleRoleplayMic() {
     const btn = document.getElementById("rp-mic-btn");
     const statusText = document.getElementById("rp-status-text");
 
-    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    const SpeechRecognition =
+        window.SpeechRecognition || window.webkitSpeechRecognition;
     if (!SpeechRecognition) {
         Swal.fire({
-            icon: 'error',
-            title: 'Navegador no compatible',
-            text: 'Navegador no soporta reconocimiento de voz.',
-            confirmButtonColor: '#4f46e5'
+            icon: "error",
+            title: "Navegador no compatible",
+            text: "Navegador no soporta reconocimiento de voz.",
+            confirmButtonColor: "#4f46e5",
         });
         return;
     }
@@ -1098,7 +1282,7 @@ function toggleRoleplayMic() {
     }
 
     roleplayRecognition = new SpeechRecognition();
-    roleplayRecognition.lang = 'en-US';
+    roleplayRecognition.lang = "en-US";
 
     roleplayRecognition.onstart = () => {
         isRPRecording = true;
@@ -1131,9 +1315,9 @@ async function sendRoleplayMessage(e) {
     }
     if (processing.roleplay) return;
     processing.roleplay = true;
-    const btn = document.getElementById('btn-send-rp');
+    const btn = document.getElementById("btn-send-rp");
     btn.disabled = true;
-    btn.classList.add('opacity-50', 'cursor-not-allowed');
+    btn.classList.add("opacity-50", "cursor-not-allowed");
     btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i>';
 
     try {
@@ -1148,32 +1332,45 @@ async function sendRoleplayMessage(e) {
 
         const res = await fetch(`${API_BASE_URL}/api/roleplay/respond`, {
             method: "POST",
-            headers: { "Content-Type": "application/json" },
+            headers: { Authorization: `Bearer ${authToken}`, "Content-Type": "application/json" },
             body: JSON.stringify({
                 scenario_id: currentScenario.id,
                 user_message: userText,
-                conversation_history: roleplayHistory
-            })
+                conversation_history: roleplayHistory,
+            }),
         });
 
         if (res.ok) {
             const data = await res.json();
             appendRPMessage("bot", data.bot_reply, data.feedback);
             playNaturalAudio(data.bot_reply);
-            roleplayHistory.push({ role: "assistant", content: data.bot_reply });
+            roleplayHistory.push({
+                role: "assistant",
+                content: data.bot_reply,
+            });
             updateUserXP(10);
         } else {
             console.error("Error Roleplay: respuesta no OK", res.status);
-            appendRPMessage("bot", "Ups, hubo un problema de conexión con el tutor. Intenta de nuevo en unos segundos.");
+            appendRPMessage(
+                "bot",
+                "Ups, hubo un problema de conexión con el tutor. Intenta de nuevo en unos segundos.",
+            );
         }
     } catch (err) {
         console.error("Error Roleplay:", err);
-        appendRPMessage("bot", "Ups, hubo un problema de conexión con el tutor. Intenta de nuevo en unos segundos.");
-        Swal.fire({ icon: 'error', title: 'Error', text: 'No se pudo enviar el mensaje.' });
+        appendRPMessage(
+            "bot",
+            "Ups, hubo un problema de conexión con el tutor. Intenta de nuevo en unos segundos.",
+        );
+        Swal.fire({
+            icon: "error",
+            title: "Error",
+            text: "No se pudo enviar el mensaje.",
+        });
     } finally {
         processing.roleplay = false;
         btn.disabled = false;
-        btn.classList.remove('opacity-50', 'cursor-not-allowed');
+        btn.classList.remove("opacity-50", "cursor-not-allowed");
         btn.innerHTML = '<i class="fa-solid fa-paper-plane"></i>';
     }
 }
@@ -1201,7 +1398,9 @@ function renderRoleplaySuggestions(suggestions) {
     }
 
     container.classList.remove("hidden");
-    container.innerHTML = suggestions.map(sug => `
+    container.innerHTML = suggestions
+        .map(
+            (sug) => `
         <button 
             type="button" 
             onclick="selectSuggestedResponse('${sug.replace(/'/g, "\\'")}', event)"
@@ -1209,7 +1408,9 @@ function renderRoleplaySuggestions(suggestions) {
         >
             💡 ${sug}
         </button>
-    `).join('');
+    `,
+        )
+        .join("");
 }
 
 // --- PLACEMENT TEST ---
@@ -1222,9 +1423,14 @@ function initPlacementTest() {
 }
 
 async function startPlacementTestProcess() {
-    ptState = { currentLevel: "A2", questionId: null, selectedOption: null, history: [] };
+    ptState = {
+        currentLevel: "A2",
+        questionId: null,
+        selectedOption: null,
+        history: [],
+    };
     try {
-        const res = await fetch(`${API_BASE_URL}/api/placement/start`);
+        const res = await conectarConServidorRender('/api/placement/start');
         if (!res.ok) return;
         const data = await res.json();
 
@@ -1232,7 +1438,9 @@ async function startPlacementTestProcess() {
         document.getElementById("pt-result-view").classList.add("hidden");
         document.getElementById("pt-quiz-view").classList.remove("hidden");
         renderPlacementQuestion(data);
-    } catch (err) { console.error(err); }
+    } catch (err) {
+        console.error(err);
+    }
 }
 
 function renderPlacementQuestion(data) {
@@ -1240,23 +1448,32 @@ function renderPlacementQuestion(data) {
     ptState.questionId = data.question.id;
     ptState.selectedOption = null;
 
-    document.getElementById("pt-step-indicator").innerText = `Pregunta ${data.step} de ${data.total_steps}`;
-    document.getElementById("pt-difficulty-indicator").innerText = `Dificultad: ${data.level}`;
-    document.getElementById("pt-progress-bar").style.width = `${(data.step / data.total_steps) * 100}%`;
-    document.getElementById("pt-question-text").innerText = data.question.question;
+    document.getElementById("pt-step-indicator").innerText =
+        `Pregunta ${data.step} de ${data.total_steps}`;
+    document.getElementById("pt-difficulty-indicator").innerText =
+        `Dificultad: ${data.level}`;
+    document.getElementById("pt-progress-bar").style.width =
+        `${(data.step / data.total_steps) * 100}%`;
+    document.getElementById("pt-question-text").innerText =
+        data.question.question;
 
     const optionsContainer = document.getElementById("pt-options-container");
-    optionsContainer.innerHTML = data.question.options.map((opt, idx) => `
+    optionsContainer.innerHTML = data.question.options
+        .map(
+            (opt, idx) => `
         <button onclick="selectPlacementOption(${idx})" 
                 id="pt-opt-${idx}"
                 class="pt-option-btn w-full text-left p-4 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-amber-50 dark:hover:bg-amber-950/30 hover:border-amber-300 dark:hover:border-amber-600 font-medium text-sm text-slate-800 dark:text-slate-100 transition">
             <span class="font-bold text-amber-600 dark:text-amber-400 mr-2">${String.fromCharCode(65 + idx)}.</span> ${opt}
         </button>
-    `).join("");
+    `,
+        )
+        .join("");
 
     const nextBtn = document.getElementById("pt-next-btn");
     nextBtn.disabled = true;
-    nextBtn.className = "w-full bg-slate-300 dark:bg-slate-700 text-slate-500 dark:text-slate-400 font-bold py-3.5 rounded-xl transition cursor-not-allowed";
+    nextBtn.className =
+        "w-full bg-slate-300 dark:bg-slate-700 text-slate-500 dark:text-slate-400 font-bold py-3.5 rounded-xl transition cursor-not-allowed";
 }
 
 function selectPlacementOption(optIdx) {
@@ -1264,36 +1481,39 @@ function selectPlacementOption(optIdx) {
 
     document.querySelectorAll(".pt-option-btn").forEach((btn, idx) => {
         if (idx === optIdx) {
-            btn.className = "pt-option-btn w-full text-left p-4 rounded-xl border-2 border-amber-500 bg-amber-50 dark:bg-amber-950/40 font-bold text-sm text-amber-950 dark:text-amber-200 transition shadow-sm";
+            btn.className =
+                "pt-option-btn w-full text-left p-4 rounded-xl border-2 border-amber-500 bg-amber-50 dark:bg-amber-950/40 font-bold text-sm text-amber-950 dark:text-amber-200 transition shadow-sm";
         } else {
-            btn.className = "pt-option-btn w-full text-left p-4 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-amber-50 dark:hover:bg-amber-950/30 font-medium text-sm text-slate-700 dark:text-slate-300 transition opacity-70";
+            btn.className =
+                "pt-option-btn w-full text-left p-4 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-amber-50 dark:hover:bg-amber-950/30 font-medium text-sm text-slate-700 dark:text-slate-300 transition opacity-70";
         }
     });
 
     const nextBtn = document.getElementById("pt-next-btn");
     nextBtn.disabled = false;
-    nextBtn.className = "w-full bg-amber-600 hover:bg-amber-700 text-white font-bold py-3.5 rounded-xl shadow transition cursor-pointer";
+    nextBtn.className =
+        "w-full bg-amber-600 hover:bg-amber-700 text-white font-bold py-3.5 rounded-xl shadow transition cursor-pointer";
 }
 
 async function submitPlacementAnswer() {
     if (ptState.selectedOption === null) return;
     if (processing.placement) return;
     processing.placement = true;
-    const btn = document.getElementById('pt-next-btn');
+    const btn = document.getElementById("pt-next-btn");
     btn.disabled = true;
-    btn.classList.add('opacity-50', 'cursor-not-allowed');
+    btn.classList.add("opacity-50", "cursor-not-allowed");
     btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Enviando...';
 
     try {
         const res = await fetch(`${API_BASE_URL}/api/placement/next`, {
             method: "POST",
-            headers: { "Content-Type": "application/json" },
+            headers: { Authorization: `Bearer ${authToken}`, "Content-Type": "application/json" },
             body: JSON.stringify({
                 current_level: ptState.currentLevel,
                 question_id: ptState.questionId,
                 selected_option: ptState.selectedOption,
-                history: ptState.history
-            })
+                history: ptState.history,
+            }),
         });
 
         if (res.ok) {
@@ -1305,16 +1525,20 @@ async function submitPlacementAnswer() {
                 renderPlacementQuestion(data);
             }
         } else {
-            throw new Error('Error al enviar respuesta');
+            throw new Error("Error al enviar respuesta");
         }
     } catch (err) {
         console.error(err);
-        Swal.fire({ icon: 'error', title: 'Error', text: 'No se pudo enviar la respuesta.' });
+        Swal.fire({
+            icon: "error",
+            title: "Error",
+            text: "No se pudo enviar la respuesta.",
+        });
     } finally {
         processing.placement = false;
         btn.disabled = false;
-        btn.classList.remove('opacity-50', 'cursor-not-allowed');
-        btn.innerHTML = 'Siguiente Pregunta';
+        btn.classList.remove("opacity-50", "cursor-not-allowed");
+        btn.innerHTML = "Siguiente Pregunta";
     }
 }
 
@@ -1327,16 +1551,17 @@ function renderPlacementResult(data) {
     document.getElementById("pt-accuracy").innerText = `${data.accuracy}%`;
 
     const descriptions = {
-        "A1": "Comprendes expresiones cotidianas muy frecuentes y frases sencillas orientadas a satisfacer necesidades básicas.",
-        "A2": "Comprendes frases y expresiones de uso frecuente relacionadas con situaciones relevantes de la vida diaria.",
-        "B1": "Comprendes los puntos principales de textos claros en lengua estándar sobre temas de trabajo o estudio.",
-        "B2": "Entiendes las ideas principales de textos complejos y conversas con suficiente fluidez con nativos."
+        A1: "Comprendes expresiones cotidianas muy frecuentes y frases sencillas orientadas a satisfacer necesidades básicas.",
+        A2: "Comprendes frases y expresiones de uso frecuente relacionadas con situaciones relevantes de la vida diaria.",
+        B1: "Comprendes los puntos principales de textos claros en lengua estándar sobre temas de trabajo o estudio.",
+        B2: "Entiendes las ideas principales de textos complejos y conversas con suficiente fluidez con nativos.",
     };
-    document.getElementById("pt-final-desc").innerText = descriptions[data.final_level] || "";
+    document.getElementById("pt-final-desc").innerText =
+        descriptions[data.final_level] || "";
 }
 
 function goToUnlockedLessons() {
-    switchTab('reading');
+    switchTab("reading");
 }
 
 function getUserLevel() {
@@ -1360,41 +1585,48 @@ async function renderCurriculum() {
     if (!container) return;
 
     try {
-        const res = await fetch(`${API_BASE_URL}/api/curriculum`);
+        const res = await conectarConServidorRender('/api/curriculum');
         if (!res.ok) return;
         const curriculum = await res.json();
 
-        container.innerHTML = Object.keys(curriculum).map(levelKey => {
-            const levelData = curriculum[levelKey];
-            const unlocked = isLevelUnlocked(levelKey);
+        container.innerHTML = Object.keys(curriculum)
+            .map((levelKey) => {
+                const levelData = curriculum[levelKey];
+                const unlocked = isLevelUnlocked(levelKey);
 
-            return `
-                <div class="mb-8 p-6 bg-slate-50 dark:bg-slate-800/40 border ${unlocked ? 'border-slate-200 dark:border-slate-700' : 'border-slate-200 dark:border-slate-800 bg-slate-100/60 dark:bg-slate-900/60'} rounded-2xl transition">
+                return `
+                <div class="mb-8 p-6 bg-slate-50 dark:bg-slate-800/40 border ${unlocked ? "border-slate-200 dark:border-slate-700" : "border-slate-200 dark:border-slate-800 bg-slate-100/60 dark:bg-slate-900/60"} rounded-2xl transition">
                     <div class="flex justify-between items-center mb-4">
                         <div class="flex items-center gap-3">
-                            <span class="px-3 py-1 text-xs font-black rounded-lg ${unlocked ? 'bg-indigo-600 text-white' : 'bg-slate-300 dark:bg-slate-700 text-slate-600 dark:text-slate-400'}">
+                            <span class="px-3 py-1 text-xs font-black rounded-lg ${unlocked ? "bg-indigo-600 text-white" : "bg-slate-300 dark:bg-slate-700 text-slate-600 dark:text-slate-400"}">
                                 ${levelKey}
                             </span>
-                            <h3 class="text-lg font-bold ${unlocked ? 'text-slate-800 dark:text-slate-100' : 'text-slate-400 dark:text-slate-500'}">
+                            <h3 class="text-lg font-bold ${unlocked ? "text-slate-800 dark:text-slate-100" : "text-slate-400 dark:text-slate-500"}">
                                 ${levelData.level_name}
                             </h3>
                         </div>
 
-                        ${unlocked ? `
+                        ${
+                            unlocked
+                                ? `
                             <span class="text-xs font-bold text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/50 px-3 py-1 rounded-full border border-emerald-200 dark:border-emerald-800/60 flex items-center gap-1">
                                 <i class="fa-solid fa-unlock"></i> Desbloqueado
                             </span>
-                        ` : `
+                        `
+                                : `
                             <span class="text-xs font-bold text-slate-500 dark:text-slate-400 bg-slate-200 dark:bg-slate-700 px-3 py-1 rounded-full flex items-center gap-1">
                                 <i class="fa-solid fa-lock"></i> Requiere Nivel ${levelKey}
                             </span>
-                        `}
+                        `
+                        }
                     </div>
 
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        ${levelData.units.map(unit => `
-                            <div class="p-5 bg-white dark:bg-slate-800 border ${unlocked ? 'border-slate-200 dark:border-slate-700 hover:border-indigo-500 dark:hover:border-indigo-400 cursor-pointer shadow-sm' : 'border-slate-200 dark:border-slate-700 opacity-60 cursor-not-allowed'} rounded-xl transition flex justify-between items-center"
-                                 onclick="${unlocked ? `loadUnitPractice('${unit.id}')` :  `Swal.fire({icon:'warning',title:'Unidad bloqueada',text:'Debes alcanzar el nivel ${levelKey} en el Test de Nivel para desbloquear esta unidad.',confirmButtonColor:'#4f46e5'})`}">
+                        ${levelData.units
+                            .map(
+                                (unit) => `
+                            <div class="p-5 bg-white dark:bg-slate-800 border ${unlocked ? "border-slate-200 dark:border-slate-700 hover:border-indigo-500 dark:hover:border-indigo-400 cursor-pointer shadow-sm" : "border-slate-200 dark:border-slate-700 opacity-60 cursor-not-allowed"} rounded-xl transition flex justify-between items-center"
+                                 onclick="${unlocked ? `loadUnitPractice('${unit.id}')` : `Swal.fire({icon:'warning',title:'Unidad bloqueada',text:'Debes alcanzar el nivel ${levelKey} en el Test de Nivel para desbloquear esta unidad.',confirmButtonColor:'#4f46e5'})`}">
                                 <div>
                                     <h4 class="font-bold text-sm text-slate-800 dark:text-slate-100">${unit.title}</h4>
                                     <p class="text-xs text-slate-600 dark:text-slate-400 mt-1"><i class="fa-solid fa-book-bookmark text-indigo-500"></i> ${unit.grammar_focus}</p>
@@ -1403,25 +1635,30 @@ async function renderCurriculum() {
                                     ${unlocked ? '<i class="fa-solid fa-chevron-right"></i>' : '<i class="fa-solid fa-lock text-slate-400 dark:text-slate-500"></i>'}
                                 </div>
                             </div>
-                        `).join("")}
+                        `,
+                            )
+                            .join("")}
                     </div>
                 </div>
             `;
-        }).join("");
-    } catch (err) { console.error(err); }
+            })
+            .join("");
+    } catch (err) {
+        console.error(err);
+    }
 }
 
 function loadUnitPractice(unitId) {
     if (allUnitsMap[unitId]) {
         currentUnit = allUnitsMap[unitId];
         renderCurrentUnit();
-        window.scrollTo({ top: 300, behavior: 'smooth' });
+        window.scrollTo({ top: 300, behavior: "smooth" });
     } else {
         Swal.fire({
-            icon: 'error',
-            title: 'Unidad no encontrada',
-            text: 'La unidad seleccionada no existe.',
-            confirmButtonColor: '#4f46e5'
+            icon: "error",
+            title: "Unidad no encontrada",
+            text: "La unidad seleccionada no existe.",
+            confirmButtonColor: "#4f46e5",
         });
     }
 }
@@ -1429,84 +1666,101 @@ function loadUnitPractice(unitId) {
 // --- GESTIÓN DE PESTAÑAS (TABS) ---
 function switchTab(tabName) {
     // Ocultar todas las secciones
-    document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));
+    document
+        .querySelectorAll(".tab-content")
+        .forEach((el) => el.classList.add("hidden"));
 
     // Mostrar la sección activa
     const activeSection = document.getElementById(`sec-${tabName}`);
-    if (activeSection) activeSection.classList.remove('hidden');
+    if (activeSection) activeSection.classList.remove("hidden");
 
     // Resaltar el ítem en el menú
-    document.querySelectorAll('#main-menu a[data-tab]').forEach(link => {
-        link.classList.remove('bg-indigo-50', 'dark:bg-indigo-950/50', 'border-l-4', 'border-indigo-500');
+    document.querySelectorAll("#main-menu a[data-tab]").forEach((link) => {
+        link.classList.remove(
+            "bg-indigo-50",
+            "dark:bg-indigo-950/50",
+            "border-l-4",
+            "border-indigo-500",
+        );
         if (link.dataset.tab === tabName) {
-            link.classList.add('bg-indigo-50', 'dark:bg-indigo-950/50', 'border-l-4', 'border-indigo-500');
+            link.classList.add(
+                "bg-indigo-50",
+                "dark:bg-indigo-950/50",
+                "border-l-4",
+                "border-indigo-500",
+            );
         }
     });
 
     // Cargar datos específicos de cada sección
     switch (tabName) {
-        case 'srs': fetchSRSStats(); fetchSRSDueWords(); break;
-        case 'ipa-matrix': fetchIPAMatrix(); break;
-        case 'roleplay': initRoleplayModule(); break;
-        case 'placement': initPlacementTest(); break;
-        case 'challenge': fetchDailyChallenge(); break;
-        case 'reading': renderCurriculum(); break;
+        case "srs":
+            fetchSRSStats();
+            fetchSRSDueWords();
+            break;
+        case "ipa-matrix":
+            fetchIPAMatrix();
+            break;
+        case "roleplay":
+            initRoleplayModule();
+            break;
+        case "placement":
+            initPlacementTest();
+            break;
+        case "challenge":
+            fetchDailyChallenge();
+            break;
+        case "reading":
+            renderCurriculum();
+            break;
     }
 }
 
 // --- FUNCIONES DE AUTENTICACIÓN ---
 function showLoginModal() {
-    const modal = document.getElementById('auth-modal');
+    const modal = document.getElementById("auth-modal");
     if (modal) {
-        modal.classList.remove('hidden');
-        document.body.style.overflow = 'hidden'; // Bloquear scroll
+        modal.classList.remove("hidden");
+        document.body.style.overflow = "hidden"; // Bloquear scroll
     }
 }
 
 function hideLoginModal() {
-    const modal = document.getElementById('auth-modal');
+    const modal = document.getElementById("auth-modal");
     if (modal) {
-        modal.classList.add('hidden');
-        document.body.style.overflow = 'auto'; // Restaurar scroll
+        modal.classList.add("hidden");
+        document.body.style.overflow = "auto"; // Restaurar scroll
     }
 }
 
 async function handleLogin(e) {
     e.preventDefault();
-    const btn = document.getElementById('btn-login');
-    const errorText = document.getElementById('login-error');
-    const username = document.getElementById('login-username').value;
-    const password = document.getElementById('login-password').value;
-    
+    const btn = document.getElementById("btn-login");
+    const errorText = document.getElementById("login-error");
+    const email = document.getElementById("login-username").value; // ahora es email
+    const password = document.getElementById("login-password").value;
+
     btn.disabled = true;
     btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Conectando...';
-    errorText.classList.add('hidden');
+    errorText.classList.add("hidden");
 
     try {
-        /* 
-         * AQUÍ VA TU LLAMADA AL BACKEND REAL (descomentar cuando el backend esté listo)
-         * const res = await fetch(`${API_BASE_URL}/api/login`, {
-         *     method: 'POST',
-         *     headers: { 'Content-Type': 'application/json' },
-         *     body: JSON.stringify({ username, password })
-         * });
-         * if (!res.ok) throw new Error('Credenciales inválidas');
-         * const data = await res.json();
-         * authToken = data.token;
-         */
+        const { data, error } = await supabaseClient.auth.signInWithPassword({ email, password });
+        if (error) throw error;
 
-        // SIMULACIÓN DE LOGIN para el frontend:
-        await new Promise(resolve => setTimeout(resolve, 800)); 
-        authToken = 'token_simulado_' + username;
-        currentUsername = username;
-        
-        localStorage.setItem('auth_token', authToken);
-        localStorage.setItem('current_username', username);
-        
+        authToken = data.session.access_token;
+        currentUsername = data.user.email;
+        localStorage.setItem("current_username", currentUsername);
+        // No necesitas guardar authToken manualmente: el SDK ya persiste
+        // la sesión (y la refresca sola) en su propio storage.
+
         hideLoginModal();
         initializeApp();
     } catch (err) {
-        errorText.classList.remove('hidden');
+        errorText.textContent = err.message === "Invalid login credentials"
+            ? "Correo o contraseña incorrectos."
+            : "No se pudo conectar. Intenta de nuevo.";
+        errorText.classList.remove("hidden");
     } finally {
         btn.disabled = false;
         btn.innerHTML = 'Entrar <i class="fa-solid fa-arrow-right"></i>';
@@ -1514,8 +1768,8 @@ async function handleLogin(e) {
 }
 
 function handleLogout() {
-    localStorage.removeItem('auth_token');
-    localStorage.removeItem('current_username');
+    localStorage.removeItem("auth_token");
+    localStorage.removeItem("current_username");
     window.location.reload(); // Recargar limpia la interfaz y muestra el modal
 }
 

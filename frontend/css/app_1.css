@@ -1,6 +1,8 @@
 /* Transición suave para cambio de tema claro/oscuro */
 body {
-    transition: background-color 0.2s ease, color 0.2s ease;
+    transition:
+        background-color 0.2s ease,
+        color 0.2s ease;
 }
 
 /* Estilos de precisión en anotaciones de pronunciación */
@@ -23,7 +25,8 @@ body {
 }
 
 /* Canvas de onda de audio para grabación */
-canvas#waveform, canvas#rp-waveform {
+canvas#waveform,
+canvas#rp-waveform {
     display: block;
     border-radius: 0.75rem;
     transition: background-color 0.2s ease;
@@ -49,4 +52,38 @@ canvas#waveform, canvas#rp-waveform {
 }
 .dark ::-webkit-scrollbar-thumb:hover {
     background: #64748b;
+}
+
+/* Overlay de login: centrado robusto en toda la pantalla,
+               incluso en moviles (100dvh evita el salto por la barra de URL) */
+#auth-modal {
+    position: fixed;
+    inset: 0;
+    z-index: 9999;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 100dvh;
+    padding: 1rem;
+}
+#auth-modal.hidden {
+    display: none !important;
+}
+#auth-modal > div {
+    margin: auto;
+}
+
+/* Mientras el modal de login esta visible, oculta por completo
+               el resto de la app (no solo taparla con el fondo difuminado) */
+#auth-modal:not(.hidden) ~ header,
+#auth-modal:not(.hidden) ~ main {
+    visibility: hidden;
+}
+
+/* El menu desplegable (#main-menu) usa position:absolute; sin un
+               ancestro posicionado se alinea respecto al documento completo
+               en vez de respecto al header. Esto lo corrige. */
+header {
+    position: relative;
+    z-index: 50;
 }
