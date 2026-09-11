@@ -110,7 +110,8 @@ def get_gemini_model(system_instruction: str):
 
 
 # --- CARGA DE CONTENIDO DESDE ARCHIVOS JSON ---
-CONTENT_DIR = Path(os.getenv("CONTENT_DIR", str(Path(__file__).resolve().parent.parent / "content")))
+# Usamos un solo .parent para quedarnos en la carpeta actual ('backend' o 'src')
+CONTENT_DIR = Path(os.getenv("CONTENT_DIR", str(Path(__file__).resolve().parent / "content")))
 
 
 def load_content(filename: str):
