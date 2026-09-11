@@ -110,7 +110,7 @@ def get_gemini_model(system_instruction: str):
 
 
 # --- CARGA DE CONTENIDO DESDE ARCHIVOS JSON ---
-CONTENT_DIR = Path(__file__).resolve().parent / "content"
+CONTENT_DIR = Path(os.getenv("CONTENT_DIR", str(Path(__file__).resolve().parent.parent / "content")))
 
 
 def load_content(filename: str):
@@ -119,17 +119,21 @@ def load_content(filename: str):
         with open(path, "r", encoding="utf-8") as f:
             return json.load(f)
     except FileNotFoundError:
-        raise RuntimeError(f"No se encontró el archivo de contenido '{path}'.")
+        raise RuntimeError(
+            f"No se encontró el archivo de contenido '{path}' "
+            f"(CONTENT_DIR resuelto a: {CONTENT_DIR.resolve()}). "
+            f"Verifica la variable de entorno CONTENT_DIR o la estructura de carpetas en Render."
+        )
     except json.JSONDecodeError as e:
         raise RuntimeError(f"El archivo '{path}' tiene un error de sintaxis JSON: {e}")
 
 
 SRS_INTERVALS = {1: 1, 2: 3, 3: 7, 4: 14, 5: 60}
 
-CURRICULUM = load_content("content/curriculum.json")
-IPA_PHONEMES = load_content("content/ipa_phonemes.json")
-ROLEPLAY_SCENARIOS = load_content("content/roleplay_scenarios.json")
-PLACEMENT_QUESTIONS = load_content("content/placement_questions.json")
+CURRICULUM = load_content("curriculum.json")
+IPA_PHONEMES = load_content("ipa_phonemes.json")
+ROLEPLAY_SCENARIOS = load_content("roleplay_scenarios.json")
+PLACEMENT_QUESTIONS = load_content("placement_questions.json")
 LEVEL_ORDER = ["A1", "A2", "B1", "B2", "C1", "C2"]
 
 MAX_TEXT_LEN = 500  # límite defensivo para endpoints de texto libre
