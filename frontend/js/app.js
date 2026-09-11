@@ -395,6 +395,8 @@ async function fetchCurriculum() {
     const select = document.getElementById("material-select");
     const display = document.getElementById("text-display");
 
+    console.warn("fetchCurriculum: authToken =", authToken); // Depuración
+
     try {
         const res = await conectarConServidorRender('/api/curriculum');
         if (!res.ok) throw new Error("Servidor no disponible");
@@ -905,8 +907,15 @@ async function fetchSRSDueWords() {
     }
 }
 
+//localStorage.clear();
+
 async function conectarConServidorRender(endpoint){
-    console.warn("Conectando con el backend API:", authToken);
+
+    if (!authToken) {
+        console.error("No se encontró token de autenticación. Redirigiendo a login...");
+        return false; // O manejar la redirección a la pantalla de login
+    }
+  
     return await fetch(`${API_BASE_URL}${endpoint}`, {
             method: "GET",
             headers: { Authorization: `Bearer ${authToken}` },
