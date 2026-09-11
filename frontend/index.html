@@ -1,363 +1,719 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="es">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>LinguaBoost Pro - Aprende Inglés Interactivo</title>
-    <!-- Línea para agregar el archivo .ico -->
-    <link
-            rel="shortcut icon"
-            href="img/favicon.ico"
-            type="image/x-icon"
-        />
-    <link rel="shortcut icon" href="#">
-    <!-- Tailwind CSS CDN -->
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script>
-        tailwind.config = {
-            darkMode: 'class',
-            theme: {
-                extend: {
-                    colors: {
-                        brand: {
-                            50: '#eef2ff',
-                            600: '#4f46e5',
-                            700: '#4338ca',
-                            800: '#3730a3',
-                            900: '#312e81',
-                        }
-                    }
-                }
-            }
-        }
-    </script>
-    <!-- FontAwesome Icons -->
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <!-- Chart.js -->
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <!-- Custom CSS -->
-    <link rel="stylesheet" href="css/app.css">
-</head>
-<body class="bg-slate-50 text-slate-900 font-sans min-h-screen flex flex-col dark:bg-slate-900 dark:text-slate-100 transition-colors duration-200">
-
-    <!-- Header / Navbar -->
-    <header class="bg-indigo-600 dark:bg-indigo-900 text-white shadow-md">
-        <div class="max-w-6xl mx-auto px-4 py-4 flex justify-between items-center">
-            <h1 class="text-2xl font-black flex items-center gap-2 tracking-tight">
-                <i class="fa-solid fa-graduation-cap text-indigo-200"></i> LinguaBoost
-            </h1>
-            <div class="flex items-center gap-4">
-                <span id="nav-user-level-badge" class="text-xs bg-indigo-800 dark:bg-indigo-950 text-indigo-100 px-3.5 py-1.5 rounded-full font-bold border border-indigo-500/30">
-                    Nivel: A1
-                </span>
-                <button id="dark-mode-toggle" class="text-white text-xl hover:text-indigo-200 transition p-1 rounded-lg focus:outline-none focus:ring-2 focus:ring-white/50" aria-label="Cambiar Modo Oscuro">
-                    <i class="fa-solid fa-moon"></i>
-                </button>
-            </div>
-        </div>
-    </header>
-
-    <!-- Main Container -->
-    <main class="max-w-6xl mx-auto px-4 py-8 flex-1 w-full">
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>LinguaBoost Pro - Aprende Inglés Interactivo</title>
+        <link rel="shortcut icon" href="img/favicon.ico" type="image/x-icon" />
         
-        <!-- DASHBOARD DE ESTADÍSTICAS -->
-        <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
-            <div class="bg-white dark:bg-slate-800 p-4 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700">
-                <span class="text-xs font-semibold uppercase tracking-wider text-slate-600 dark:text-slate-400">Nivel</span>
-                <p class="text-2xl font-black text-slate-800 dark:text-slate-100 mt-1" id="user-level">1</p>
+        <!-- Material Icons -->
+        <link
+            href="https://fonts.googleapis.com/icon?family=Material+Icons"
+            rel="stylesheet" />
+        <!-- FontAwesome (para el resto de iconos) -->
+        <link
+            rel="stylesheet"
+            href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
+        <!-- Chart.js -->
+        <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+        
+         <!-- Tailwind -->
+         <link rel="stylesheet" href="./css/output.css" />
+         <!-- Custom CSS -->
+         <!--link rel="stylesheet" href="css/app.css" /-->
+        <link rel="stylesheet" href="./css/app_1.css" />
+    </head>
+    <body
+        class="bg-slate-50 text-slate-900 font-sans min-h-screen flex flex-col dark:bg-slate-900 dark:text-slate-100 transition-colors duration-200">
+        <!-- Header / Navbar con menú hamburguesa -->
+        <header class="bg-indigo-600 dark:bg-indigo-900 text-white shadow-md">
+            <div
+                class="max-w-6xl mx-auto px-4 py-4 flex justify-between items-center">
+                <!-- Botón menú + título -->
+                <div class="flex items-center gap-3">
+                    <button
+                        id="menu-toggle"
+                        class="text-white text-3xl focus:outline-none hover:text-indigo-200 transition"
+                        aria-label="Abrir menú">
+                        <i class="material-icons text-3xl">menu</i>
+                    </button>
+                    <h1
+                        class="text-2xl font-black flex items-center gap-2 tracking-tight">
+                        <i
+                            class="fa-solid fa-graduation-cap text-indigo-200"></i>
+                        LinguaBoost
+                    </h1>
+                </div>
+                <!-- Badge de nivel y modo oscuro -->
+                <div class="flex items-center gap-4">
+                    <span
+                        id="nav-user-level-badge"
+                        class="text-xs bg-indigo-800 dark:bg-indigo-950 text-indigo-100 px-3.5 py-1.5 rounded-full font-bold border border-indigo-500/30">
+                        Nivel: A1
+                    </span>
+                    <button
+                        id="dark-mode-toggle"
+                        class="text-white text-xl hover:text-indigo-200 transition p-1 rounded-lg focus:outline-none focus:ring-2 focus:ring-white/50"
+                        aria-label="Cambiar Modo Oscuro">
+                        <i class="fa-solid fa-moon"></i>
+                    </button>
+                </div>
             </div>
-            <div class="bg-white dark:bg-slate-800 p-4 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700">
-                <span class="text-xs font-semibold uppercase tracking-wider text-slate-600 dark:text-slate-400">XP</span>
-                <p class="text-2xl font-black text-amber-600 dark:text-amber-400 mt-1" id="user-xp">0</p>
+            <!-- Menú desplegable -->
+            <div
+                id="main-menu"
+                class="hidden absolute left-0 right-0 mt-2 bg-white dark:bg-slate-800 shadow-xl rounded-b-2xl border border-slate-200 dark:border-slate-700 z-50 max-w-6xl mx-auto overflow-hidden">
+                <div class="py-2">
+                    <div
+                        class="px-4 py-1 text-xs uppercase text-slate-500 dark:text-slate-400 font-bold">
+                        Habilidades
+                    </div>
+                    <a
+                        href="#"
+                        data-tab="reading"
+                        class="flex items-center px-4 py-2.5 hover:bg-indigo-50 dark:hover:bg-indigo-950/50 text-slate-800 dark:text-slate-100 transition">
+                        <i
+                            class="material-icons mr-3 text-indigo-600 dark:text-indigo-400">
+                            menu_book
+                        </i>
+                        Reading & Speaking
+                    </a>
+                    <a
+                        href="#"
+                        data-tab="listening"
+                        class="flex items-center px-4 py-2.5 hover:bg-indigo-50 dark:hover:bg-indigo-950/50 text-slate-800 dark:text-slate-100 transition">
+                        <i
+                            class="material-icons mr-3 text-indigo-600 dark:text-indigo-400">
+                            headphones
+                        </i>
+                        Listening
+                    </a>
+                    <a
+                        href="#"
+                        data-tab="writing"
+                        class="flex items-center px-4 py-2.5 hover:bg-indigo-50 dark:hover:bg-indigo-950/50 text-slate-800 dark:text-slate-100 transition">
+                        <i
+                            class="material-icons mr-3 text-indigo-600 dark:text-indigo-400">
+                            edit
+                        </i>
+                        Writing
+                    </a>
+                    <a
+                        href="#"
+                        data-tab="shadowing"
+                        class="flex items-center px-4 py-2.5 hover:bg-indigo-50 dark:hover:bg-indigo-950/50 text-slate-800 dark:text-slate-100 transition">
+                        <i
+                            class="material-icons mr-3 text-indigo-600 dark:text-indigo-400">
+                            repeat
+                        </i>
+                        Shadowing
+                    </a>
+                    <div
+                        class="border-t border-slate-200 dark:border-slate-700 my-2"></div>
+                    <div
+                        class="px-4 py-1 text-xs uppercase text-slate-500 dark:text-slate-400 font-bold">
+                        Vocabulario
+                    </div>
+                    <a
+                        href="#"
+                        data-tab="srs"
+                        class="flex items-center px-4 py-2.5 hover:bg-indigo-50 dark:hover:bg-indigo-950/50 text-slate-800 dark:text-slate-100 transition">
+                        <i
+                            class="material-icons mr-3 text-indigo-600 dark:text-indigo-400">
+                            layers
+                        </i>
+                        Banco SRS
+                    </a>
+                    <a
+                        href="#"
+                        data-tab="ipa-matrix"
+                        class="flex items-center px-4 py-2.5 hover:bg-indigo-50 dark:hover:bg-indigo-950/50 text-slate-800 dark:text-slate-100 transition">
+                        <i
+                            class="material-icons mr-3 text-indigo-600 dark:text-indigo-400">
+                            translate
+                        </i>
+                        Tabla Fonética
+                    </a>
+                    <div
+                        class="border-t border-slate-200 dark:border-slate-700 my-2"></div>
+                    <div
+                        class="px-4 py-1 text-xs uppercase text-slate-500 dark:text-slate-400 font-bold">
+                        Conversación
+                    </div>
+                    <a
+                        href="#"
+                        data-tab="roleplay"
+                        class="flex items-center px-4 py-2.5 hover:bg-indigo-50 dark:hover:bg-indigo-950/50 text-slate-800 dark:text-slate-100 transition">
+                        <i
+                            class="material-icons mr-3 text-indigo-600 dark:text-indigo-400">
+                            chat
+                        </i>
+                        Roleplay por Voz
+                    </a>
+                    <div
+                        class="border-t border-slate-200 dark:border-slate-700 my-2"></div>
+                    <div
+                        class="px-4 py-1 text-xs uppercase text-slate-500 dark:text-slate-400 font-bold">
+                        Evaluación
+                    </div>
+                    <a
+                        href="#"
+                        data-tab="placement"
+                        class="flex items-center px-4 py-2.5 hover:bg-indigo-50 dark:hover:bg-indigo-950/50 text-slate-800 dark:text-slate-100 transition">
+                        <i
+                            class="material-icons mr-3 text-indigo-600 dark:text-indigo-400">
+                            science
+                        </i>
+                        Test de Nivel
+                    </a>
+                    <a
+                        href="#"
+                        data-tab="challenge"
+                        class="flex items-center px-4 py-2.5 hover:bg-indigo-50 dark:hover:bg-indigo-950/50 text-slate-800 dark:text-slate-100 transition">
+                        <i
+                            class="material-icons mr-3 text-indigo-600 dark:text-indigo-400">
+                            emoji_events
+                        </i>
+                        Desafío Diario
+                    </a>
+                </div>
             </div>
-            <div class="bg-white dark:bg-slate-800 p-4 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700">
-                <span class="text-xs font-semibold uppercase tracking-wider text-slate-600 dark:text-slate-400">Racha</span>
-                <p class="text-2xl font-black text-rose-600 dark:text-rose-400 mt-1" id="user-streak">0</p>
-            </div>
-            <div class="bg-white dark:bg-slate-800 p-4 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700">
-                <span class="text-xs font-semibold uppercase tracking-wider text-slate-600 dark:text-slate-400">Medallas</span>
-                <p class="text-2xl font-black text-emerald-600 dark:text-emerald-400 mt-1" id="user-badges">0</p>
-            </div>
-        </div>
+        </header>
 
-        <!-- Gráfico de progreso -->
-        <div class="bg-white dark:bg-slate-800 p-5 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 mb-8">
-            <h3 class="font-bold text-slate-800 dark:text-slate-100 mb-3 text-base">Evolución de aprendizaje</h3>
-            <div class="relative h-48 w-full">
-                <canvas id="progress-chart"></canvas>
-            </div>
-        </div>
-
-        <!-- Navigation Tabs -->
-        <div class="flex flex-wrap gap-2.5 mb-8">
-            <button onclick="switchTab('reading')" id="tab-reading" class="tab-btn bg-indigo-600 text-white p-3.5 px-5 rounded-xl shadow-sm font-semibold flex items-center justify-center gap-2 transition">
-                <i class="fa-solid fa-book-open"></i> Reading & Speaking
-            </button>
-            <button onclick="switchTab('listening')" id="tab-listening" class="tab-btn bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700 p-3.5 px-5 rounded-xl shadow-sm hover:bg-slate-100 dark:hover:bg-slate-700 font-semibold flex items-center justify-center gap-2 transition">
-                <i class="fa-solid fa-headphones"></i> Listening
-            </button>
-            <button onclick="switchTab('writing')" id="tab-writing" class="tab-btn bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700 p-3.5 px-5 rounded-xl shadow-sm hover:bg-slate-100 dark:hover:bg-slate-700 font-semibold flex items-center justify-center gap-2 transition">
-                <i class="fa-solid fa-pen-nib"></i> Writing
-            </button>
-            <button onclick="switchTab('shadowing')" id="tab-shadowing" class="tab-btn bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700 p-3.5 px-5 rounded-xl shadow-sm hover:bg-slate-100 dark:hover:bg-slate-700 font-semibold flex items-center justify-center gap-2 transition">
-                <i class="fa-solid fa-clone"></i> Shadowing
-            </button>
-            <button onclick="switchTab('srs')" id="tab-srs" class="tab-btn bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700 p-3.5 px-5 rounded-xl shadow-sm hover:bg-slate-100 dark:hover:bg-slate-700 font-semibold flex items-center justify-center gap-2 transition relative">
-                <i class="fa-solid fa-layer-group"></i> Banco SRS 
-                <span id="srs-badge" class="hidden absolute -top-1 -right-1 bg-rose-600 text-white text-xs font-extrabold px-2 py-0.5 rounded-full shadow-sm">0</span>
-            </button>
-            <button onclick="switchTab('ipa-matrix')" id="tab-ipa-matrix" class="tab-btn bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700 p-3.5 px-5 rounded-xl shadow-sm hover:bg-slate-100 dark:hover:bg-slate-700 font-semibold flex items-center justify-center gap-2 transition">
-                <i class="fa-solid fa-language"></i> Tabla Fonética
-            </button>
-            <button onclick="switchTab('roleplay')" id="tab-roleplay" class="tab-btn bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700 p-3.5 px-5 rounded-xl shadow-sm hover:bg-slate-100 dark:hover:bg-slate-700 font-semibold flex items-center justify-center gap-2 transition">
-                <i class="fa-solid fa-comments"></i> Roleplay por Voz
-            </button>
-            <button onclick="switchTab('placement')" id="tab-placement" class="tab-btn bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700 p-3.5 px-5 rounded-xl shadow-sm hover:bg-slate-100 dark:hover:bg-slate-700 font-semibold flex items-center justify-center gap-2 transition">
-                <i class="fa-solid fa-vial"></i> Test de Nivel
-            </button>
-            <button onclick="switchTab('challenge')" id="tab-challenge" class="tab-btn bg-amber-600 hover:bg-amber-700 text-white p-3.5 px-5 rounded-xl shadow-sm font-bold flex items-center justify-center gap-2 transition">
-                <i class="fa-solid fa-trophy"></i> Desafío Diario
-            </button>
-        </div>
-
-        <!-- SECCIÓN 1: READING & SPEAKING -->
-        <section id="sec-reading" class="tab-content bg-white dark:bg-slate-800 p-6 md:p-8 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-700">
-            <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-4">
-                <h2 class="text-xl font-bold text-slate-800 dark:text-slate-100">Práctica de Lectura y Pronunciación</h2>
-                <select id="material-select" onchange="loadMaterial()" class="border border-slate-300 dark:border-slate-600 rounded-lg p-2.5 text-sm bg-white dark:bg-slate-700 text-slate-800 dark:text-slate-100 font-medium focus:ring-2 focus:ring-indigo-500">
-                    <option value="1">Cargando textos...</option>
-                </select>
-            </div>
-            <p class="text-sm text-slate-600 dark:text-slate-300 mb-6">Escucha el texto nativo, practica con la técnica de shadowing y grábate para recibir retroalimentación palabra por palabra.</p>
-
-            <div id="text-display" class="bg-slate-100 dark:bg-slate-900 p-6 rounded-xl border border-slate-200 dark:border-slate-700 text-lg leading-relaxed mb-6 font-medium text-slate-800 dark:text-slate-100">
-                Selecciona una lectura para comenzar...
-            </div>
-
-            <div class="flex flex-wrap gap-4 items-center mb-6">
-                <button onclick="playTargetAudio()" class="bg-emerald-600 hover:bg-emerald-700 text-white px-5 py-2.5 rounded-lg font-bold flex items-center gap-2 shadow-sm transition">
-                    <i class="fa-solid fa-volume-high"></i> Escuchar Modelo
-                </button>
-                <button id="btn-record" onclick="toggleRecording()" class="bg-rose-600 hover:bg-rose-700 text-white px-5 py-2.5 rounded-lg font-bold flex items-center gap-2 shadow-sm transition">
-                    <i class="fa-solid fa-microphone"></i> <span id="record-text">Empezar a Grabar</span>
-                </button>
-                <canvas id="waveform" class="w-full max-w-xs h-10 rounded-xl bg-slate-200 dark:bg-slate-700"></canvas>
+        <!-- Main Container -->
+        <main class="max-w-6xl mx-auto px-4 py-8 flex-1 w-full">
+            <!-- DASHBOARD DE ESTADÍSTICAS -->
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+                <div
+                    class="bg-white dark:bg-slate-800 p-4 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700">
+                    <span
+                        class="text-xs font-semibold uppercase tracking-wider text-slate-600 dark:text-slate-400">
+                        Nivel
+                    </span>
+                    <p
+                        class="text-2xl font-black text-slate-800 dark:text-slate-100 mt-1"
+                        id="user-level">
+                        1
+                    </p>
+                </div>
+                <div
+                    class="bg-white dark:bg-slate-800 p-4 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700">
+                    <span
+                        class="text-xs font-semibold uppercase tracking-wider text-slate-600 dark:text-slate-400">
+                        XP
+                    </span>
+                    <p
+                        class="text-2xl font-black text-amber-600 dark:text-amber-400 mt-1"
+                        id="user-xp">
+                        0
+                    </p>
+                </div>
+                <div
+                    class="bg-white dark:bg-slate-800 p-4 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700">
+                    <span
+                        class="text-xs font-semibold uppercase tracking-wider text-slate-600 dark:text-slate-400">
+                        Racha
+                    </span>
+                    <p
+                        class="text-2xl font-black text-rose-600 dark:text-rose-400 mt-1"
+                        id="user-streak">
+                        0
+                    </p>
+                </div>
+                <div
+                    class="bg-white dark:bg-slate-800 p-4 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700">
+                    <span
+                        class="text-xs font-semibold uppercase tracking-wider text-slate-600 dark:text-slate-400">
+                        Medallas
+                    </span>
+                    <p
+                        class="text-2xl font-black text-emerald-600 dark:text-emerald-400 mt-1"
+                        id="user-badges">
+                        0
+                    </p>
+                </div>
             </div>
 
-            <div id="reading-results" class="hidden bg-indigo-50 dark:bg-indigo-950/40 border border-indigo-200 dark:border-indigo-800/60 p-6 rounded-xl">
-                <h3 class="font-bold text-indigo-900 dark:text-indigo-200 mb-2 flex items-center gap-2">
-                    <i class="fa-solid fa-chart-pie text-indigo-600 dark:text-indigo-400"></i> Resultado de tu Pronunciación
+            <!-- Gráfico de progreso -->
+            <div
+                class="bg-white dark:bg-slate-800 p-5 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 mb-8">
+                <h3
+                    class="font-bold text-slate-800 dark:text-slate-100 mb-3 text-base">
+                    Evolución de aprendizaje
                 </h3>
-                <p id="accuracy-score" class="text-2xl font-black text-indigo-700 dark:text-indigo-300 mb-4"></p>
-                <div id="annotated-text" class="bg-white dark:bg-slate-900 p-4 rounded-lg border border-indigo-200 dark:border-indigo-800/60 leading-loose text-lg text-slate-800 dark:text-slate-100"></div>
-                <p class="text-xs text-slate-500 dark:text-slate-400 mt-3">* Haz clic sobre las palabras marcadas en rojo para escuchar la pronunciación correcta.</p>
-            </div>
-        </section>
-
-        <!-- SECCIÓN 2: LISTENING -->
-        <section id="sec-listening" class="tab-content hidden bg-white dark:bg-slate-800 p-6 md:p-8 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-700">
-            <h2 class="text-xl font-bold text-slate-800 dark:text-slate-100 mb-2">Comprensión Auditiva y Dictado</h2>
-            <p class="text-sm text-slate-600 dark:text-slate-300 mb-6">Escucha la locución en inglés y escribe exactamente lo que oyes para entrenar tu oído.</p>
-            <div class="flex items-center gap-4 mb-6">
-                <button onclick="playDictationAudio(1.0)" class="bg-indigo-600 hover:bg-indigo-700 text-white px-5 py-2.5 rounded-lg font-bold flex items-center gap-2 shadow-sm transition">
-                    <i class="fa-solid fa-play"></i> Reproducir Audio
-                </button>
-            </div>
-            <textarea id="dictation-input" rows="3" placeholder="Escribe aquí lo que escuchaste..." class="w-full p-4 border border-slate-300 dark:border-slate-600 rounded-xl bg-slate-50 dark:bg-slate-700 text-slate-800 dark:text-slate-100 focus:ring-2 focus:ring-indigo-500 focus:outline-none mb-4 font-medium"></textarea>
-            <button onclick="checkDictation()" class="bg-emerald-600 hover:bg-emerald-700 text-white px-6 py-2.5 rounded-lg font-bold shadow-sm transition">
-                Comprobar Dictado
-            </button>
-            <div id="dictation-feedback" class="hidden mt-4 p-4 rounded-xl"></div>
-        </section>
-
-        <!-- SECCIÓN 3: WRITING -->
-        <section id="sec-writing" class="tab-content hidden bg-white dark:bg-slate-800 p-6 md:p-8 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-700">
-            <h2 class="text-xl font-bold text-slate-800 dark:text-slate-100 mb-2">Evaluación Gramatical y Escritura</h2>
-            <p class="text-sm text-slate-600 dark:text-slate-300 mb-6">Escribe un texto libre o una composición en inglés para analizar errores gramaticales y vocabulario.</p>
-            <div class="writing-container space-y-4">
-                <textarea 
-                    id="writing-input" 
-                    rows="5" 
-                    placeholder="Type or paste your text here..."
-                    class="w-full p-4 border rounded-xl dark:bg-slate-800 dark:text-white"
-                ></textarea>
-
-                <!-- El botón DEBE llevar type="button" y pasar (event) en onclick -->
-                <button 
-                    type="button" 
-                    onclick="analyzeWriting(event)" 
-                    class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold px-6 py-2.5 rounded-lg shadow-sm transition"
-                >
-                    Analizar Gramática
-                </button>
-            </div>
-            <div id="writing-results" class="hidden mt-6 space-y-4"></div>
-        </section>
-
-        <!-- SECCIÓN 4: SHADOWING -->
-        <section id="sec-shadowing" class="tab-content hidden bg-white dark:bg-slate-800 p-6 md:p-8 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-700">
-            <h2 class="text-xl font-bold text-slate-800 dark:text-slate-100 mb-2">Entrenamiento por Shadowing</h2>
-            <p class="text-sm text-slate-600 dark:text-slate-300 mb-6">La técnica de Shadowing consiste en repetir las oraciones inmediatamente después de escucharlas para mejorar entonación y fluidez.</p>
-            <button onclick="startShadowingRoutine()" class="bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-3 rounded-lg font-bold shadow-sm transition mb-6">
-                <i class="fa-solid fa-play"></i> Iniciar Rutina de Shadowing
-            </button>
-            <div id="shadowing-display" class="p-6 bg-slate-50 dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-100 text-lg font-medium">
-                Presiona el botón para iniciar la reproducción por frases.
-            </div>
-        </section>
-
-        <!-- SECCIÓN 5: SRS BANCO DE MEMORIA -->
-        <section id="sec-srs" class="tab-content hidden bg-white dark:bg-slate-800 p-6 md:p-8 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-700">
-            <h2 class="text-xl font-bold text-slate-800 dark:text-slate-100 mb-2 flex items-center gap-2">
-                <i class="fa-solid fa-layer-group text-indigo-600 dark:text-indigo-400"></i> Repetición Espaciada (SRS)
-            </h2>
-            <p class="text-sm text-slate-600 dark:text-slate-300 mb-6">Repasa tus palabras pendientes de hoy para consolidar el vocabulario en la memoria a largo plazo.</p>
-            
-            <div id="srs-card-container" class="max-w-md mx-auto bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-2xl p-8 text-center shadow-sm">
-                <p id="srs-word-display" class="text-3xl font-extrabold text-slate-800 dark:text-slate-100 mb-2">---</p>
-                <p id="srs-ipa-display" class="text-sm font-mono text-indigo-600 dark:text-indigo-400 font-bold mb-6">/---/</p>
-                <button onclick="playSRSWordAudio()" class="mb-6 text-indigo-600 dark:text-indigo-400 hover:text-indigo-800 text-lg font-bold flex items-center justify-center gap-2 mx-auto">
-                    <i class="fa-solid fa-volume-high"></i> Escuchar Pronunciación
-                </button>
-                <div class="grid grid-cols-2 gap-4">
-                    <button onclick="submitSRSReview(false)" class="bg-rose-600 hover:bg-rose-700 text-white font-bold py-3 rounded-xl transition shadow-sm">
-                        No la recordaba
-                    </button>
-                    <button onclick="submitSRSReview(true)" class="bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-3 rounded-xl transition shadow-sm">
-                        ¡Recordada!
-                    </button>
+                <div class="relative h-48 w-full">
+                    <canvas id="progress-chart"></canvas>
                 </div>
             </div>
 
-            <div id="srs-empty-state" class="hidden text-center py-12">
-                <i class="fa-solid fa-circle-check text-5xl text-emerald-500 mb-3"></i>
-                <h3 class="text-xl font-bold text-slate-800 dark:text-slate-100">¡Todo repasado por hoy!</h3>
-                <p class="text-sm text-slate-600 dark:text-slate-400 mt-1">No tienes tarjetas pendientes de revisión en este momento.</p>
-            </div>
-        </section>
-
-        <!-- SECCIÓN 6: TABLA FONÉTICA IPA -->
-        <section id="sec-ipa-matrix" class="tab-content hidden bg-white dark:bg-slate-800 p-6 md:p-8 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-700">
-            <h2 class="text-xl font-bold text-slate-800 dark:text-slate-100 mb-2">Matriz Fonética Internacional (IPA)</h2>
-            <p class="text-sm text-slate-600 dark:text-slate-300 mb-6">Haz clic en cualquier símbolo para escuchar su sonido distintivo e identificar palabras clave.</p>
-            
-            <h3 class="font-bold text-slate-800 dark:text-slate-200 mb-3 text-sm uppercase tracking-wider">Vocales Monoftongos</h3>
-            <div id="vowels-grid" class="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-6 gap-3 mb-6"></div>
-
-            <h3 class="font-bold text-slate-800 dark:text-slate-200 mb-3 text-sm uppercase tracking-wider">Diftongos</h3>
-            <div id="diphthongs-grid" class="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-6 gap-3 mb-6"></div>
-
-            <h3 class="font-bold text-slate-800 dark:text-slate-200 mb-3 text-sm uppercase tracking-wider">Consonantes</h3>
-            <div id="consonants-grid" class="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-6 gap-3 mb-6"></div>
-        </section>
-
-        <!-- SECCIÓN 7: ROLEPLAY -->
-        <section id="sec-roleplay" class="tab-content hidden bg-white dark:bg-slate-800 p-6 md:p-8 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-700">
-            <div class="mb-6">
-                <h2 class="text-xl font-bold text-slate-800 dark:text-slate-100 flex items-center gap-2">
-                    <i class="fa-solid fa-comments text-emerald-600 dark:text-emerald-400"></i> Roleplay Conversacional por Voz
-                </h2>
-                <p class="text-sm text-slate-600 dark:text-slate-300">Práctica tu conversación en tiempo real con situaciones reales de la vida cotidiana.</p>
-            </div>
-            
-            <div id="roleplay-scenarios-grid" class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8"></div>
-            
-            <!-- (Contenedor de chat actualizado) -->
-            <div id="roleplay-chat-box" class="hidden border border-slate-200 dark:border-slate-700 rounded-2xl overflow-hidden bg-slate-50 dark:bg-slate-900 shadow-sm">
-                <div class="bg-indigo-600 dark:bg-indigo-800 text-white p-4 flex justify-between items-center">
-                    <div class="flex items-center gap-3">
-                        <i id="rp-active-icon" class="fa-solid fa-comments text-2xl"></i>
-                        <div>
-                            <h3 id="rp-active-title" class="font-bold text-lg">---</h3>
-                            <p id="rp-active-role" class="text-xs text-indigo-100">---</p>
-                        </div>
-                    </div>
-                    <button type="button" onclick="closeRoleplayChat()" class="text-xs bg-indigo-700 hover:bg-indigo-900 text-white px-3 py-1.5 rounded-lg transition font-semibold">
-                        <i class="fa-solid fa-xmark"></i> Cambiar Escenario
-                    </button>
+            <!-- SECCIÓN 1: READING & SPEAKING -->
+            <section
+                id="sec-reading"
+                class="tab-content bg-white dark:bg-slate-800 p-6 md:p-8 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-700">
+                <div
+                    class="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-4">
+                    <h2
+                        class="text-xl font-bold text-slate-800 dark:text-slate-100">
+                        Práctica de Lectura y Pronunciación
+                    </h2>
+                    <select
+                        id="material-select"
+                        onchange="loadMaterial()"
+                        class="border border-slate-300 dark:border-slate-600 rounded-lg p-2.5 text-sm bg-white dark:bg-slate-700 text-slate-800 dark:text-slate-100 font-medium focus:ring-2 focus:ring-indigo-500">
+                        <option value="1">Cargando textos...</option>
+                    </select>
                 </div>
-                <div id="rp-messages" class="p-6 h-80 overflow-y-auto space-y-4 text-slate-800 dark:text-slate-100"></div>
-                <div id="rp-suggestions" class="p-3 bg-white dark:bg-slate-800 border-t border-slate-200 dark:border-slate-700 flex flex-wrap gap-2 text-xs"></div>
-                
-                <!-- FORMULARIO EXPLÍCITO QUE INTERCEPTA LA RECARGA DE PÁGINA -->
-                <form id="rp-form" onsubmit="sendRoleplayMessage(event); return false;" class="p-4 bg-white dark:bg-slate-800 border-t border-slate-200 dark:border-slate-700 flex items-center gap-3">
-                    <button id="rp-mic-btn" type="button" onclick="toggleRoleplayMic()" class="w-12 h-12 rounded-full bg-indigo-600 hover:bg-indigo-700 text-white flex items-center justify-center text-xl shadow transition shrink-0">
+                <p class="text-sm text-slate-600 dark:text-slate-300 mb-6">
+                    Escucha el texto nativo, practica con la técnica de
+                    shadowing y grábate para recibir retroalimentación palabra
+                    por palabra.
+                </p>
+
+                <div
+                    id="text-display"
+                    class="bg-slate-100 dark:bg-slate-900 p-6 rounded-xl border border-slate-200 dark:border-slate-700 text-lg leading-relaxed mb-6 font-medium text-slate-800 dark:text-slate-100">
+                    Selecciona una lectura para comenzar...
+                </div>
+
+                <div class="flex flex-wrap gap-4 items-center mb-6">
+                    <button
+                        onclick="playTargetAudio()"
+                        class="bg-emerald-600 hover:bg-emerald-700 text-white px-5 py-2.5 rounded-lg font-bold flex items-center gap-2 shadow-sm transition">
+                        <i class="fa-solid fa-volume-high"></i>
+                        Escuchar Modelo
+                    </button>
+                    <button
+                        id="btn-record"
+                        onclick="toggleRecording()"
+                        class="bg-rose-600 hover:bg-rose-700 text-white px-5 py-2.5 rounded-lg font-bold flex items-center gap-2 shadow-sm transition">
                         <i class="fa-solid fa-microphone"></i>
+                        <span id="record-text">Empezar a Grabar</span>
                     </button>
-                    <div class="flex-grow">
-                        <p id="rp-status-text" class="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1">Presiona el micrófono para hablar...</p>
-                        <input 
-                            type="text" 
-                            id="rp-transcript-input" 
-                            placeholder="O escribe tu respuesta en inglés aquí..." 
-                            class="w-full text-sm p-2.5 border border-slate-300 dark:border-slate-600 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white dark:bg-slate-700 text-slate-800 dark:text-white font-medium"
-                        >
+                    <canvas
+                        id="waveform"
+                        class="w-full max-w-xs h-10 rounded-xl bg-slate-200 dark:bg-slate-700"></canvas>
+                </div>
+
+                <div
+                    id="reading-results"
+                    class="hidden bg-indigo-50 dark:bg-indigo-950/40 border border-indigo-200 dark:border-indigo-800/60 p-6 rounded-xl">
+                    <h3
+                        class="font-bold text-indigo-900 dark:text-indigo-200 mb-2 flex items-center gap-2">
+                        <i
+                            class="fa-solid fa-chart-pie text-indigo-600 dark:text-indigo-400"></i>
+                        Resultado de tu Pronunciación
+                    </h3>
+                    <p
+                        id="accuracy-score"
+                        class="text-2xl font-black text-indigo-700 dark:text-indigo-300 mb-4"></p>
+                    <div
+                        id="annotated-text"
+                        class="bg-white dark:bg-slate-900 p-4 rounded-lg border border-indigo-200 dark:border-indigo-800/60 leading-loose text-lg text-slate-800 dark:text-slate-100"></div>
+                    <p class="text-xs text-slate-500 dark:text-slate-400 mt-3">
+                        * Haz clic sobre las palabras marcadas en rojo para
+                        escuchar la pronunciación correcta.
+                    </p>
+                </div>
+            </section>
+
+            <!-- SECCIÓN 2: LISTENING -->
+            <section
+                id="sec-listening"
+                class="tab-content hidden bg-white dark:bg-slate-800 p-6 md:p-8 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-700">
+                <h2
+                    class="text-xl font-bold text-slate-800 dark:text-slate-100 mb-2">
+                    Comprensión Auditiva y Dictado
+                </h2>
+                <p class="text-sm text-slate-600 dark:text-slate-300 mb-6">
+                    Escucha la locución en inglés y escribe exactamente lo que
+                    oyes para entrenar tu oído.
+                </p>
+                <div class="flex items-center gap-4 mb-6">
+                    <button
+                        onclick="playDictationAudio(1.0)"
+                        class="bg-indigo-600 hover:bg-indigo-700 text-white px-5 py-2.5 rounded-lg font-bold flex items-center gap-2 shadow-sm transition">
+                        <i class="fa-solid fa-play"></i>
+                        Reproducir Audio
+                    </button>
+                </div>
+                <textarea
+                    id="dictation-input"
+                    rows="3"
+                    placeholder="Escribe aquí lo que escuchaste..."
+                    class="w-full p-4 border border-slate-300 dark:border-slate-600 rounded-xl bg-slate-50 dark:bg-slate-700 text-slate-800 dark:text-slate-100 focus:ring-2 focus:ring-indigo-500 focus:outline-none mb-4 font-medium"></textarea>
+                <button
+                    id="btn-check-dictation"
+                    onclick="checkDictation()"
+                    class="bg-emerald-600 hover:bg-emerald-700 text-white px-6 py-2.5 rounded-lg font-bold shadow-sm transition">
+                    Comprobar Dictado
+                </button>
+                <div
+                    id="dictation-feedback"
+                    class="hidden mt-4 p-4 rounded-xl"></div>
+            </section>
+
+            <!-- SECCIÓN 3: WRITING -->
+            <section
+                id="sec-writing"
+                class="tab-content hidden bg-white dark:bg-slate-800 p-6 md:p-8 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-700">
+                <h2
+                    class="text-xl font-bold text-slate-800 dark:text-slate-100 mb-2">
+                    Evaluación Gramatical y Escritura
+                </h2>
+                <p class="text-sm text-slate-600 dark:text-slate-300 mb-6">
+                    Escribe un texto libre o una composición en inglés para
+                    analizar errores gramaticales y vocabulario.
+                </p>
+                <div class="writing-container space-y-4">
+                    <textarea
+                        id="writing-input"
+                        rows="5"
+                        placeholder="Type or paste your text here..."
+                        class="w-full p-4 border rounded-xl dark:bg-slate-800 dark:text-white"></textarea>
+                    <button
+                        id="btn-analyze-writing"
+                        type="button"
+                        onclick="analyzeWriting(event)"
+                        class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold px-6 py-2.5 rounded-lg shadow-sm transition">
+                        Analizar Gramática
+                    </button>
+                </div>
+                <div id="writing-results" class="hidden mt-6 space-y-4"></div>
+            </section>
+
+            <!-- SECCIÓN 4: SHADOWING -->
+            <section
+                id="sec-shadowing"
+                class="tab-content hidden bg-white dark:bg-slate-800 p-6 md:p-8 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-700">
+                <h2
+                    class="text-xl font-bold text-slate-800 dark:text-slate-100 mb-2">
+                    Entrenamiento por Shadowing
+                </h2>
+                <p class="text-sm text-slate-600 dark:text-slate-300 mb-6">
+                    La técnica de Shadowing consiste en repetir las oraciones
+                    inmediatamente después de escucharlas para mejorar
+                    entonación y fluidez.
+                </p>
+                <button
+                    id="btn-shadowing"
+                    onclick="startShadowingRoutine()"
+                    class="bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-3 rounded-lg font-bold shadow-sm transition mb-6">
+                    <i class="fa-solid fa-play"></i>
+                    Iniciar Rutina de Shadowing
+                </button>
+                <div
+                    id="shadowing-display"
+                    class="p-6 bg-slate-50 dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-100 text-lg font-medium">
+                    Presiona el botón para iniciar la reproducción por frases.
+                </div>
+            </section>
+
+            <!-- SECCIÓN 5: SRS -->
+            <section
+                id="sec-srs"
+                class="tab-content hidden bg-white dark:bg-slate-800 p-6 md:p-8 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-700">
+                <h2
+                    class="text-xl font-bold text-slate-800 dark:text-slate-100 mb-2 flex items-center gap-2">
+                    <i
+                        class="fa-solid fa-layer-group text-indigo-600 dark:text-indigo-400"></i>
+                    Repetición Espaciada (SRS)
+                </h2>
+                <p class="text-sm text-slate-600 dark:text-slate-300 mb-6">
+                    Repasa tus palabras pendientes de hoy para consolidar el
+                    vocabulario en la memoria a largo plazo.
+                </p>
+
+                <div
+                    id="srs-card-container"
+                    class="max-w-md mx-auto bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-2xl p-8 text-center shadow-sm">
+                    <p
+                        id="srs-word-display"
+                        class="text-3xl font-extrabold text-slate-800 dark:text-slate-100 mb-2">
+                        ---
+                    </p>
+                    <p
+                        id="srs-ipa-display"
+                        class="text-sm font-mono text-indigo-600 dark:text-indigo-400 font-bold mb-6">
+                        /---/
+                    </p>
+                    <button
+                        onclick="playSRSWordAudio()"
+                        class="mb-6 text-indigo-600 dark:text-indigo-400 hover:text-indigo-800 text-lg font-bold flex items-center justify-center gap-2 mx-auto">
+                        <i class="fa-solid fa-volume-high"></i>
+                        Escuchar Pronunciación
+                    </button>
+                    <div class="grid grid-cols-2 gap-4">
+                        <button
+                            id="btn-srs-no"
+                            onclick="submitSRSReview(false)"
+                            class="bg-rose-600 hover:bg-rose-700 text-white font-bold py-3 rounded-xl transition shadow-sm">
+                            No la recordaba
+                        </button>
+                        <button
+                            id="btn-srs-yes"
+                            onclick="submitSRSReview(true)"
+                            class="bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-3 rounded-xl transition shadow-sm">
+                            ¡Recordada!
+                        </button>
                     </div>
-                    <button type="submit" class="bg-emerald-600 hover:bg-emerald-700 text-white p-3.5 rounded-xl font-bold transition shrink-0">
-                        <i class="fa-solid fa-paper-plane"></i>
+                </div>
+
+                <div id="srs-empty-state" class="hidden text-center py-12">
+                    <i
+                        class="fa-solid fa-circle-check text-5xl text-emerald-500 mb-3"></i>
+                    <h3
+                        class="text-xl font-bold text-slate-800 dark:text-slate-100">
+                        ¡Todo repasado por hoy!
+                    </h3>
+                    <p class="text-sm text-slate-600 dark:text-slate-400 mt-1">
+                        No tienes tarjetas pendientes de revisión en este
+                        momento.
+                    </p>
+                </div>
+            </section>
+
+            <!-- SECCIÓN 6: IPA -->
+            <section
+                id="sec-ipa-matrix"
+                class="tab-content hidden bg-white dark:bg-slate-800 p-6 md:p-8 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-700">
+                <h2
+                    class="text-xl font-bold text-slate-800 dark:text-slate-100 mb-2">
+                    Matriz Fonética Internacional (IPA)
+                </h2>
+                <p class="text-sm text-slate-600 dark:text-slate-300 mb-6">
+                    Haz clic en cualquier símbolo para escuchar su sonido
+                    distintivo e identificar palabras clave.
+                </p>
+                <h3
+                    class="font-bold text-slate-800 dark:text-slate-200 mb-3 text-sm uppercase tracking-wider">
+                    Vocales Monoftongos
+                </h3>
+                <div
+                    id="vowels-grid"
+                    class="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-6 gap-3 mb-6"></div>
+                <h3
+                    class="font-bold text-slate-800 dark:text-slate-200 mb-3 text-sm uppercase tracking-wider">
+                    Diftongos
+                </h3>
+                <div
+                    id="diphthongs-grid"
+                    class="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-6 gap-3 mb-6"></div>
+                <h3
+                    class="font-bold text-slate-800 dark:text-slate-200 mb-3 text-sm uppercase tracking-wider">
+                    Consonantes
+                </h3>
+                <div
+                    id="consonants-grid"
+                    class="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-6 gap-3 mb-6"></div>
+            </section>
+
+            <!-- SECCIÓN 7: ROLEPLAY -->
+            <section
+                id="sec-roleplay"
+                class="tab-content hidden bg-white dark:bg-slate-800 p-6 md:p-8 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-700">
+                <div class="mb-6">
+                    <h2
+                        class="text-xl font-bold text-slate-800 dark:text-slate-100 flex items-center gap-2">
+                        <i
+                            class="fa-solid fa-comments text-emerald-600 dark:text-emerald-400"></i>
+                        Roleplay Conversacional por Voz
+                    </h2>
+                    <p class="text-sm text-slate-600 dark:text-slate-300">
+                        Práctica tu conversación en tiempo real con situaciones
+                        reales de la vida cotidiana.
+                    </p>
+                </div>
+                <div
+                    id="roleplay-scenarios-grid"
+                    class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8"></div>
+                <div
+                    id="roleplay-chat-box"
+                    class="hidden border border-slate-200 dark:border-slate-700 rounded-2xl overflow-hidden bg-slate-50 dark:bg-slate-900 shadow-sm">
+                    <div
+                        class="bg-indigo-600 dark:bg-indigo-800 text-white p-4 flex justify-between items-center">
+                        <div class="flex items-center gap-3">
+                            <i
+                                id="rp-active-icon"
+                                class="fa-solid fa-comments text-2xl"></i>
+                            <div>
+                                <h3
+                                    id="rp-active-title"
+                                    class="font-bold text-lg">
+                                    ---
+                                </h3>
+                                <p
+                                    id="rp-active-role"
+                                    class="text-xs text-indigo-100">
+                                    ---
+                                </p>
+                            </div>
+                        </div>
+                        <button
+                            type="button"
+                            onclick="closeRoleplayChat()"
+                            class="text-xs bg-indigo-700 hover:bg-indigo-900 text-white px-3 py-1.5 rounded-lg transition font-semibold">
+                            <i class="fa-solid fa-xmark"></i>
+                            Cambiar Escenario
+                        </button>
+                    </div>
+                    <div
+                        id="rp-messages"
+                        class="p-6 h-80 overflow-y-auto space-y-4 text-slate-800 dark:text-slate-100"></div>
+                    <div
+                        id="rp-suggestions"
+                        class="p-3 bg-white dark:bg-slate-800 border-t border-slate-200 dark:border-slate-700 flex flex-wrap gap-2 text-xs"></div>
+                    <form
+                        id="rp-form"
+                        onsubmit="
+                            sendRoleplayMessage(event);
+                            return false;
+                        "
+                        class="p-4 bg-white dark:bg-slate-800 border-t border-slate-200 dark:border-slate-700 flex items-center gap-3">
+                        <button
+                            id="rp-mic-btn"
+                            type="button"
+                            onclick="toggleRoleplayMic()"
+                            class="w-12 h-12 rounded-full bg-indigo-600 hover:bg-indigo-700 text-white flex items-center justify-center text-xl shadow transition shrink-0">
+                            <i class="fa-solid fa-microphone"></i>
+                        </button>
+                        <div class="flex-grow">
+                            <p
+                                id="rp-status-text"
+                                class="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1">
+                                Presiona el micrófono para hablar...
+                            </p>
+                            <input
+                                type="text"
+                                id="rp-transcript-input"
+                                placeholder="O escribe tu respuesta en inglés aquí..."
+                                class="w-full text-sm p-2.5 border border-slate-300 dark:border-slate-600 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white dark:bg-slate-700 text-slate-800 dark:text-white font-medium" />
+                        </div>
+                        <button
+                            id="btn-send-rp"
+                            type="submit"
+                            class="bg-emerald-600 hover:bg-emerald-700 text-white p-3.5 rounded-xl font-bold transition shrink-0">
+                            <i class="fa-solid fa-paper-plane"></i>
+                        </button>
+                    </form>
+                    <canvas
+                        id="rp-waveform"
+                        class="w-full h-8 bg-slate-200 dark:bg-slate-700"></canvas>
+                </div>
+            </section>
+
+            <!-- SECCIÓN 8: PLACEMENT TEST -->
+            <section
+                id="sec-placement"
+                class="tab-content hidden bg-white dark:bg-slate-800 p-6 md:p-8 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-700 max-w-2xl mx-auto">
+                <div id="pt-start-view" class="text-center py-6">
+                    <i
+                        class="fa-solid fa-vial text-5xl text-indigo-600 dark:text-indigo-400 mb-4"></i>
+                    <h2
+                        class="text-2xl font-black text-slate-800 dark:text-slate-100 mb-2">
+                        Test Diagnóstico de Nivel MCER
+                    </h2>
+                    <p class="text-sm text-slate-600 dark:text-slate-300 mb-6">
+                        Evalúa tu nivel actual de comprensión del idioma (de A1
+                        a B2) con un examen adaptativo.
+                    </p>
+                    <button
+                        onclick="startPlacementTestProcess()"
+                        class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold px-8 py-3.5 rounded-xl shadow transition">
+                        Comenzar Evaluación Diagnóstica
                     </button>
-                </form>
-                <canvas id="rp-waveform" class="w-full h-8 bg-slate-200 dark:bg-slate-700"></canvas>
-            </div>
-        </section>
-
-        <!-- SECCIÓN 8: TEST DE NIVEL (PLACEMENT TEST) -->
-        <section id="sec-placement" class="tab-content hidden bg-white dark:bg-slate-800 p-6 md:p-8 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-700 max-w-2xl mx-auto">
-            <div id="pt-start-view" class="text-center py-6">
-                <i class="fa-solid fa-vial text-5xl text-indigo-600 dark:text-indigo-400 mb-4"></i>
-                <h2 class="text-2xl font-black text-slate-800 dark:text-slate-100 mb-2">Test Diagnóstico de Nivel MCER</h2>
-                <p class="text-sm text-slate-600 dark:text-slate-300 mb-6">Evalúa tu nivel actual de comprensión del idioma (de A1 a B2) con un examen adaptativo.</p>
-                <button onclick="startPlacementTestProcess()" class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold px-8 py-3.5 rounded-xl shadow transition">
-                    Comenzar Evaluación Diagnóstica
-                </button>
-            </div>
-
-            <div id="pt-quiz-view" class="hidden">
-                <div class="flex justify-between items-center text-xs font-bold text-slate-600 dark:text-slate-400 mb-2">
-                    <span id="pt-step-indicator">Pregunta 1 de 10</span>
-                    <span id="pt-difficulty-indicator" class="text-indigo-600 dark:text-indigo-400">Dificultad: A2</span>
                 </div>
-                <div class="w-full bg-slate-200 dark:bg-slate-700 h-2 rounded-full mb-6 overflow-hidden">
-                    <div id="pt-progress-bar" class="bg-indigo-600 h-2 w-0 transition-all duration-300"></div>
+                <div id="pt-quiz-view" class="hidden">
+                    <div
+                        class="flex justify-between items-center text-xs font-bold text-slate-600 dark:text-slate-400 mb-2">
+                        <span id="pt-step-indicator">Pregunta 1 de 10</span>
+                        <span
+                            id="pt-difficulty-indicator"
+                            class="text-indigo-600 dark:text-indigo-400">
+                            Dificultad: A2
+                        </span>
+                    </div>
+                    <div
+                        class="w-full bg-slate-200 dark:bg-slate-700 h-2 rounded-full mb-6 overflow-hidden">
+                        <div
+                            id="pt-progress-bar"
+                            class="bg-indigo-600 h-2 w-0 transition-all duration-300"></div>
+                    </div>
+                    <p
+                        id="pt-question-text"
+                        class="text-lg font-bold text-slate-800 dark:text-slate-100 mb-6">
+                        ---
+                    </p>
+                    <div id="pt-options-container" class="space-y-3 mb-6"></div>
+                    <button
+                        id="pt-next-btn"
+                        onclick="submitPlacementAnswer()"
+                        disabled
+                        class="w-full bg-slate-300 dark:bg-slate-700 text-slate-500 dark:text-slate-400 font-bold py-3.5 rounded-xl transition cursor-not-allowed">
+                        Siguiente Pregunta
+                    </button>
                 </div>
-                <span id="placement-level-badge" class="hidden"></span>
-                <p id="pt-question-text" class="text-lg font-bold text-slate-800 dark:text-slate-100 mb-6">---</p>
-                <div id="pt-options-container" class="space-y-3 mb-6"></div>
-                <button id="pt-next-btn" onclick="submitPlacementAnswer()" disabled class="w-full bg-slate-300 dark:bg-slate-700 text-slate-500 dark:text-slate-400 font-bold py-3.5 rounded-xl transition cursor-not-allowed">
-                    Siguiente Pregunta
-                </button>
-            </div>
-
-            <div id="pt-result-view" class="hidden text-center py-6">
-                <div class="bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 p-6 rounded-2xl mb-6">
-                    <i class="fa-solid fa-trophy text-4xl text-amber-500 mb-2"></i>
-                    <h3 class="text-xl font-bold text-slate-800 dark:text-slate-100 mb-1">¡Test Completado!</h3>
-                    <p class="text-sm text-slate-600 dark:text-slate-300 mb-4">Tu nivel sugerido en el Marco Común Europeo es:</p>
-                    <p id="pt-final-level" class="text-5xl font-black text-indigo-600 dark:text-indigo-400 mb-2">A2</p>
-                    <p class="text-xs font-semibold text-slate-500 dark:text-slate-400">Precisión global: <span id="pt-accuracy" class="text-slate-800 dark:text-slate-200">0%</span></p>
-                    <p id="pt-final-desc" class="text-sm text-slate-700 dark:text-slate-300 mt-4 leading-relaxed font-medium"></p>
+                <div id="pt-result-view" class="hidden text-center py-6">
+                    <div
+                        class="bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 p-6 rounded-2xl mb-6">
+                        <i
+                            class="fa-solid fa-trophy text-4xl text-amber-500 mb-2"></i>
+                        <h3
+                            class="text-xl font-bold text-slate-800 dark:text-slate-100 mb-1">
+                            ¡Test Completado!
+                        </h3>
+                        <p
+                            class="text-sm text-slate-600 dark:text-slate-300 mb-4">
+                            Tu nivel sugerido en el Marco Común Europeo es:
+                        </p>
+                        <p
+                            id="pt-final-level"
+                            class="text-5xl font-black text-indigo-600 dark:text-indigo-400 mb-2">
+                            A2
+                        </p>
+                        <p
+                            class="text-xs font-semibold text-slate-500 dark:text-slate-400">
+                            Precisión global:
+                            <span
+                                id="pt-accuracy"
+                                class="text-slate-800 dark:text-slate-200">
+                                0%
+                            </span>
+                        </p>
+                        <p
+                            id="pt-final-desc"
+                            class="text-sm text-slate-700 dark:text-slate-300 mt-4 leading-relaxed font-medium"></p>
+                    </div>
+                    <button
+                        onclick="goToUnlockedLessons()"
+                        class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3.5 rounded-xl shadow transition">
+                        Ver mis Lecciones Desbloqueadas
+                    </button>
                 </div>
-                <button onclick="goToUnlockedLessons()" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3.5 rounded-xl shadow transition">
-                    Ver mis Lecciones Desbloqueadas
-                </button>
-            </div>
-        </section>
+            </section>
 
-        <!-- SECCIÓN 9: DESAFÍO DIARIO -->
-        <section id="sec-challenge" class="tab-content hidden bg-white dark:bg-slate-800 p-6 md:p-8 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-700">
-            <h2 class="text-xl font-bold text-slate-800 dark:text-slate-100 mb-2 flex items-center gap-2">
-                <i class="fa-solid fa-trophy text-amber-500"></i> Desafío Diario
-            </h2>
-            <p class="text-sm text-slate-600 dark:text-slate-300 mb-6">Completa las misiones de hoy para ganar experiencia extra y mantener tu racha activa.</p>
-            <div id="challenge-missions" class="grid grid-cols-1 md:grid-cols-3 gap-4"></div>
-        </section>
+            <!-- SECCIÓN 9: DESAFÍO DIARIO -->
+            <section
+                id="sec-challenge"
+                class="tab-content hidden bg-white dark:bg-slate-800 p-6 md:p-8 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-700">
+                <h2
+                    class="text-xl font-bold text-slate-800 dark:text-slate-100 mb-2 flex items-center gap-2">
+                    <i class="fa-solid fa-trophy text-amber-500"></i>
+                    Desafío Diario
+                </h2>
+                <p class="text-sm text-slate-600 dark:text-slate-300 mb-6">
+                    Completa las misiones de hoy para ganar experiencia extra y
+                    mantener tu racha activa.
+                </p>
+                <div
+                    id="challenge-missions"
+                    class="grid grid-cols-1 md:grid-cols-3 gap-4"></div>
+            </section>
 
-        <!-- SECCIÓN CURRÍCULO GENERAL -->
-        <div id="curriculum-container" class="mt-8"></div>
+            <!-- CURRÍCULO GENERAL -->
+            <div id="curriculum-container" class="mt-8"></div>
+        </main>
 
-    </main>
-
-    <!-- Scripts -->
-    <script src="js/app.js?v=1.2"></script>
-</body>
+        <!-- Scripts -->
+        <script src="js/app_1.js?v=1.3"></script>
+    </body>
 </html>

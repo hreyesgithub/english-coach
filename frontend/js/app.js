@@ -1,5 +1,5 @@
 // ==========================================
-// LinguaBoost Pro - Frontend Application Engine (v4.5 High Contrast)
+// LinguaBoost Pro - Frontend Application Engine (v4.6)
 // ==========================================
 
 // Para pruebas locales
@@ -39,6 +39,19 @@ let ptState = {
 
 const LEVEL_ORDER = ["A1", "A2", "B1", "B2", "C1", "C2"];
 
+// ----- FLAGS DE PROCESAMIENTO (para evitar doble clic) -----
+const processing = {
+    recording: false,
+    writing: false,
+    dictation: false,
+    shadowing: false,
+    srs: false,
+    roleplay: false,
+    placement: false,
+    mission: false,
+    audio: false  // para playNaturalAudio
+};
+
 // --- 1. INICIALIZACIÓN ---
 document.addEventListener("DOMContentLoaded", () => {
     initDarkMode();
@@ -54,13 +67,36 @@ document.addEventListener("DOMContentLoaded", () => {
     const writingInput = document.getElementById("writing-input");
     if (writingInput) {
         writingInput.addEventListener("keydown", (e) => {
-            // Si presionan Enter sin Shift, analizamos sin recargar
             if (e.key === "Enter" && !e.shiftKey) {
                 e.preventDefault();
                 analyzeWriting(e);
             }
         });
     }
+
+    // ----- Menú principal -----
+    const menuToggle = document.getElementById('menu-toggle');
+    const mainMenu = document.getElementById('main-menu');
+
+    menuToggle.addEventListener('click', (e) => {
+        e.stopPropagation();
+        mainMenu.classList.toggle('hidden');
+    });
+
+    document.querySelectorAll('#main-menu a[data-tab]').forEach(link => {
+        link.addEventListener('click', (e) => {
+            e.preventDefault();
+            const tab = link.dataset.tab;
+            switchTab(tab);
+            mainMenu.classList.add('hidden');
+        });
+    });
+
+    document.addEventListener('click', (e) => {
+        if (!mainMenu.contains(e.target) && e.target !== menuToggle && !menuToggle.contains(e.target)) {
+            mainMenu.classList.add('hidden');
+        }
+    });
 });
 
 // --- MODO OSCURO ---
@@ -79,7 +115,7 @@ function initDarkMode() {
             const activeDark = document.documentElement.classList.contains('dark');
             localStorage.setItem('dark-mode', activeDark);
             toggle.innerHTML = activeDark ? '<i class="fa-solid fa-sun text-amber-400"></i>' : '<i class="fa-solid fa-moon"></i>';
-            if (progressChart) fetchProgressData(); // Recargar gráfico con paleta correspondiente
+            if (progressChart) fetchProgressData();
         });
     }
 }
@@ -167,7 +203,7 @@ function showXPPopup(gain) {
     setTimeout(() => popup.remove(), 2000);
 }
 
-// --- GRÁFICO DE PROGRESO Adaptado a Contrastes ---
+// --- GRÁFICO DE PROGRESO ---
 async function fetchProgressData() {
     try {
         const res = await fetch(`${API_BASE_URL}/api/user/progress?days=30`);
@@ -208,7 +244,7 @@ async function fetchProgressData() {
     } catch (e) { console.error('Error cargando gráfico:', e); }
 }
 
-// --- DESAFÍO DIARIO CON ALTO CONTRASTE ---
+// --- DESAFÍO DIARIO ---
 async function fetchDailyChallenge() {
     try {
         const res = await fetch(`${API_BASE_URL}/api/daily-challenge`);
@@ -221,7 +257,7 @@ async function fetchDailyChallenge() {
             <div class="bg-slate-50 dark:bg-slate-700/60 p-4 rounded-xl border border-slate-200 dark:border-slate-600">
                 <div class="flex items-center justify-between mb-2">
                     <span class="text-sm font-bold text-amber-700 dark:text-amber-400">Misión ${m.id}</span>
-                    <button onclick="completeMission(${m.id})" class="text-xs bg-amber-600 hover:bg-amber-700 text-white px-3 py-1 rounded-lg transition font-semibold">Completar</button>
+                    <button onclick="completeMission(${m.id}, this)" class="text-xs bg-amber-600 hover:bg-amber-700 text-white px-3 py-1 rounded-lg transition font-semibold">Completar</button>
                 </div>
                 <p class="text-slate-800 dark:text-slate-100 font-medium">${m.text}</p>
             </div>
@@ -229,12 +265,20 @@ async function fetchDailyChallenge() {
     } catch (e) { console.error('Error en Desafío Diario:', e); }
 }
 
-async function completeMission(missionId) {
+async function completeMission(missionId, btnElement) {
+    if (processing.mission) return;
+    processing.mission = true;
+    if (btnElement) {
+        btnElement.disabled = true;
+        btnElement.classList.add('opacity-50', 'cursor-not-allowed');
+        btnElement.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i>';
+    }
+
     try {
         const res = await fetch(`${API_BASE_URL}/api/daily-challenge/complete?mission_id=${missionId}`, { method: 'POST' });
         if (res.ok) {
             const data = await res.json();
-             await Swal.fire({
+            await Swal.fire({
                 icon: 'success',
                 title: '¡Misión completada!',
                 text: `+${data.xp_gained} XP`,
@@ -242,8 +286,25 @@ async function completeMission(missionId) {
                 showConfirmButton: false
             });
             await fetchUserStats();
+        } else {
+            throw new Error('Error al completar misión');
         }
-    } catch (e) { console.error('Error al completar misión:', e); }
+    } catch (e) {
+        console.error('Error al completar misión:', e);
+        Swal.fire({
+            icon: 'error',
+            title: 'Error',
+            text: 'No se pudo completar la misión. Intenta de nuevo.',
+            confirmButtonColor: '#4f46e5'
+        });
+    } finally {
+        processing.mission = false;
+        if (btnElement) {
+            btnElement.disabled = false;
+            btnElement.classList.remove('opacity-50', 'cursor-not-allowed');
+            btnElement.innerHTML = 'Completar';
+        }
+    }
 }
 
 // --- CURRÍCULO & LECTURAS ---
@@ -325,16 +386,22 @@ function renderCurrentUnit() {
     if (results) results.classList.add("hidden");
 }
 
-// --- AUDIO SÍNTESIS ---
+// --- AUDIO SÍNTESIS CON BLOQUEO ---
 function playNaturalAudio(text, voice = "en-US-AriaNeural") {
-    if (!text) return;
+    if (!text || processing.audio) return;
+    processing.audio = true;
     const audioUrl = `${API_BASE_URL}/api/tts-natural?text=${encodeURIComponent(text)}&voice=${voice}`;
     const audio = new Audio(audioUrl);
-    
+
+    audio.onended = () => { processing.audio = false; };
+    audio.onerror = () => { processing.audio = false; };
+
     audio.play().catch(() => {
         window.speechSynthesis.cancel();
         const utterance = new SpeechSynthesisUtterance(text);
         utterance.lang = "en-US";
+        utterance.onend = () => { processing.audio = false; };
+        utterance.onerror = () => { processing.audio = false; };
         window.speechSynthesis.speak(utterance);
     });
 }
@@ -367,16 +434,24 @@ function toggleRecording() {
 }
 
 async function startRecording() {
-    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-        await Swal.fire({
-            icon: 'error',
-            title: 'Navegador no compatible',
-            text: 'Tu navegador no soporta entrada de audio.',
-            confirmButtonColor: '#4f46e5'
-        });
-        return;
-    }
+    if (processing.recording) return;
+    processing.recording = true;
+    const btn = document.getElementById('btn-record');
+    const textSpan = document.getElementById('record-text');
+    btn.disabled = true;
+    btn.classList.add('opacity-50', 'cursor-not-allowed');
+    textSpan.innerText = 'Grabando...';
+
     try {
+        if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+            await Swal.fire({
+                icon: 'error',
+                title: 'Navegador no compatible',
+                text: 'Tu navegador no soporta entrada de audio.',
+                confirmButtonColor: '#4f46e5'
+            });
+            return;
+        }
         const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
         mediaRecorder = new MediaRecorder(stream);
         recordedChunks = [];
@@ -403,16 +478,25 @@ async function startRecording() {
         
         mediaRecorder.start();
         isRecording = true;
-        document.getElementById('record-text').innerText = "Detener y Evaluar";
-        document.getElementById('btn-record').classList.replace('bg-rose-600', 'bg-slate-800');
+        textSpan.innerText = "Detener y Evaluar";
+        btn.classList.replace('bg-rose-600', 'bg-slate-800');
         await startAudioVisualization(stream, waveformCanvas, waveformCtx);
     } catch (e) {
+        console.error(e);
         Swal.fire({
             icon: 'error',
             title: 'Activación de micrófono',
-            text: 'No se pudo activar el micrófono..',
+            text: 'No se pudo activar el micrófono.',
             confirmButtonColor: '#4f46e5'
         });
+    } finally {
+        processing.recording = false;
+        btn.disabled = false;
+        btn.classList.remove('opacity-50', 'cursor-not-allowed');
+        if (!isRecording) {
+            textSpan.innerText = "Empezar a Grabar";
+            btn.classList.replace('bg-slate-800', 'bg-rose-600');
+        }
     }
 }
 
@@ -423,6 +507,11 @@ function stopRecording() {
         document.getElementById('record-text').innerText = "Empezar a Grabar";
         document.getElementById('btn-record').classList.replace('bg-slate-800', 'bg-rose-600');
         if (mediaRecorder.stream) mediaRecorder.stream.getTracks().forEach(t => t.stop());
+        // Restaurar botón si no se hizo en finally (por si startRecording no terminó)
+        const btn = document.getElementById('btn-record');
+        btn.disabled = false;
+        btn.classList.remove('opacity-50', 'cursor-not-allowed');
+        processing.recording = false;
     }
 }
 
@@ -472,60 +561,82 @@ function playDictationAudio() {
     if (currentUnit) playNaturalAudio(currentUnit.text);
 }
 
-function checkDictation() {
-    if (!currentUnit) return;
-    const userInput = document.getElementById("dictation-input").value.trim().toLowerCase().replace(/[^\w\s]/g, "");
-    const targetText = currentUnit.text.trim().toLowerCase().replace(/[^\w\s]/g, "");
-    const feedback = document.getElementById("dictation-feedback");
+async function checkDictation() {
+    if (processing.dictation) return;
+    processing.dictation = true;
+    const btn = document.getElementById('btn-check-dictation');
+    btn.disabled = true;
+    btn.classList.add('opacity-50', 'cursor-not-allowed');
+    btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Comprobando...';
 
-    if (!feedback) return;
-    feedback.classList.remove("hidden");
+    try {
+        if (!currentUnit) return;
+        const userInput = document.getElementById("dictation-input").value.trim().toLowerCase().replace(/[^\w\s]/g, "");
+        const targetText = currentUnit.text.trim().toLowerCase().replace(/[^\w\s]/g, "");
+        const feedback = document.getElementById("dictation-feedback");
 
-    if (userInput === targetText) {
-        feedback.className = "mt-4 p-4 rounded-xl bg-emerald-50 dark:bg-emerald-950/50 text-emerald-900 dark:text-emerald-200 font-bold border border-emerald-200 dark:border-emerald-800";
-        feedback.innerText = "🎉 ¡Perfecto! Escribiste la frase con total exactitud.";
-        updateUserXP(10);
-    } else {
-        feedback.className = "mt-4 p-4 rounded-xl bg-amber-50 dark:bg-amber-950/50 text-amber-900 dark:text-amber-200 border border-amber-200 dark:border-amber-800";
-        feedback.innerHTML = `
-            <p class="font-bold mb-1.5 text-amber-900 dark:text-amber-200">Casi lo logras. Compara lo que escribiste:</p>
-            <p class="text-sm text-slate-700 dark:text-slate-300 mb-2"><strong>Tu respuesta:</strong> <span class="bg-white dark:bg-slate-800 px-2 py-0.5 rounded border border-amber-300 dark:border-amber-700 font-mono">${userInput || "(vacío)"}</span></p>
-            <p class="text-sm text-emerald-800 dark:text-emerald-300"><strong>Original:</strong> ${currentUnit.text}</p>
-        `;
+        if (!feedback) return;
+        feedback.classList.remove("hidden");
+
+        if (userInput === targetText) {
+            feedback.className = "mt-4 p-4 rounded-xl bg-emerald-50 dark:bg-emerald-950/50 text-emerald-900 dark:text-emerald-200 font-bold border border-emerald-200 dark:border-emerald-800";
+            feedback.innerText = "🎉 ¡Perfecto! Escribiste la frase con total exactitud.";
+            updateUserXP(10);
+        } else {
+            feedback.className = "mt-4 p-4 rounded-xl bg-amber-50 dark:bg-amber-950/50 text-amber-900 dark:text-amber-200 border border-amber-200 dark:border-amber-800";
+            feedback.innerHTML = `
+                <p class="font-bold mb-1.5 text-amber-900 dark:text-amber-200">Casi lo logras. Compara lo que escribiste:</p>
+                <p class="text-sm text-slate-700 dark:text-slate-300 mb-2"><strong>Tu respuesta:</strong> <span class="bg-white dark:bg-slate-800 px-2 py-0.5 rounded border border-amber-300 dark:border-amber-700 font-mono">${userInput || "(vacío)"}</span></p>
+                <p class="text-sm text-emerald-800 dark:text-emerald-300"><strong>Original:</strong> ${currentUnit.text}</p>
+            `;
+        }
+    } catch (e) {
+        console.error(e);
+        Swal.fire({ icon: 'error', title: 'Error', text: 'No se pudo verificar el dictado.' });
+    } finally {
+        processing.dictation = false;
+        btn.disabled = false;
+        btn.classList.remove('opacity-50', 'cursor-not-allowed');
+        btn.innerHTML = 'Comprobar Dictado';
     }
 }
 
 // --- WRITING GRAMMAR CHECK ---
 async function analyzeWriting(e) {
-    // Frena cualquier comportamiento por defecto inmediatamente
     if (e) {
-        if (typeof e.preventDefault === "function") e.preventDefault();
-        if (typeof e.stopPropagation === "function") e.stopPropagation();
+        e.preventDefault();
+        e.stopPropagation();
     }
+    if (processing.writing) return;
+    processing.writing = true;
 
-    const input = document.getElementById("writing-input");
-    const resDiv = document.getElementById("writing-results");
-    if (!input || !resDiv) return;
-
-    const text = input.value.trim();
-    if (!text) {
-        await Swal.fire({
-            icon: 'warning',
-            title: 'Texto vacío',
-            text: 'Escribe o pega un texto en inglés.',
-            confirmButtonColor: '#4f46e5'
-        });
-        return;
-    }
-
-    // Mostrar el indicador de carga
-    resDiv.classList.remove("hidden");
-    resDiv.innerHTML = `
-        <div class="p-4 bg-indigo-50 dark:bg-indigo-950/40 text-indigo-800 dark:text-indigo-200 rounded-xl font-medium animate-pulse flex items-center gap-2">
-            <i class="fa-solid fa-circle-notch fa-spin"></i> Analizando texto...
-        </div>`;
+    const btn = document.getElementById('btn-analyze-writing');
+    btn.disabled = true;
+    btn.classList.add('opacity-50', 'cursor-not-allowed');
+    btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Analizando...';
 
     try {
+        const input = document.getElementById("writing-input");
+        const resDiv = document.getElementById("writing-results");
+        if (!input || !resDiv) return;
+
+        const text = input.value.trim();
+        if (!text) {
+            await Swal.fire({
+                icon: 'warning',
+                title: 'Texto vacío',
+                text: 'Escribe o pega un texto en inglés.',
+                confirmButtonColor: '#4f46e5'
+            });
+            return;
+        }
+
+        resDiv.classList.remove("hidden");
+        resDiv.innerHTML = `
+            <div class="p-4 bg-indigo-50 dark:bg-indigo-950/40 text-indigo-800 dark:text-indigo-200 rounded-xl font-medium animate-pulse flex items-center gap-2">
+                <i class="fa-solid fa-circle-notch fa-spin"></i> Analizando texto...
+            </div>`;
+
         const response = await fetch(`${API_BASE_URL}/api/check-writing`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
@@ -541,7 +652,6 @@ async function analyzeWriting(e) {
                 <span class="text-2xl font-black text-indigo-600 dark:text-indigo-400">${data.score}/100</span>
             </div>`;
 
-        // Renderizar resultado cuando NO HAY errores
         if (!data.feedback || data.feedback.length === 0) {
             html += `
                 <div class="p-4 bg-emerald-50 dark:bg-emerald-950/50 border border-emerald-200 dark:border-emerald-800 text-emerald-800 dark:text-emerald-200 rounded-xl font-bold flex items-center gap-3">
@@ -549,7 +659,6 @@ async function analyzeWriting(e) {
                     <span>¡Excelente! Tu texto no contiene errores gramaticales detectables.</span>
                 </div>`;
         } else {
-            // Renderizar listado de sugerencias
             html += `<ul class="space-y-3">`;
             data.feedback.forEach(item => {
                 html += `
@@ -562,33 +671,62 @@ async function analyzeWriting(e) {
         }
 
         resDiv.innerHTML = html;
-
     } catch (err) {
         console.error("Writing Error:", err);
-        resDiv.innerHTML = `
-            <div class="p-4 bg-rose-50 dark:bg-rose-950/50 text-rose-800 dark:text-rose-200 border border-rose-200 dark:border-rose-800 rounded-xl font-medium">
-                ⚠️ Ocurrió un error al conectar con el servidor.
-            </div>`;
+        const resDiv = document.getElementById("writing-results");
+        if (resDiv) {
+            resDiv.innerHTML = `
+                <div class="p-4 bg-rose-50 dark:bg-rose-950/50 text-rose-800 dark:text-rose-200 border border-rose-200 dark:border-rose-800 rounded-xl font-medium">
+                    ⚠️ Ocurrió un error al conectar con el servidor.
+                </div>`;
+        }
+        Swal.fire({ icon: 'error', title: 'Error', text: 'No se pudo analizar el texto.' });
+    } finally {
+        processing.writing = false;
+        btn.disabled = false;
+        btn.classList.remove('opacity-50', 'cursor-not-allowed');
+        btn.innerHTML = 'Analizar Gramática';
     }
 }
 
 // --- SHADOWING ---
 function startShadowingRoutine() {
-    if (!currentUnit) return;
-    const sentences = currentUnit.text.match(/[^.!?]+[.!?]+/g) || [currentUnit.text];
-    let index = 0;
+    if (processing.shadowing) return;
+    processing.shadowing = true;
+    const btn = document.getElementById('btn-shadowing');
+    btn.disabled = true;
+    btn.classList.add('opacity-50', 'cursor-not-allowed');
+    btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Reproduciendo...';
 
-    function playNextSentence() {
-        if (index < sentences.length) {
-            const current = sentences[index].trim();
-            const display = document.getElementById('shadowing-display');
-            if (display) display.innerText = current;
-            playNaturalAudio(current);
-            index++;
-            setTimeout(playNextSentence, 4500);
+    try {
+        if (!currentUnit) return;
+        const sentences = currentUnit.text.match(/[^.!?]+[.!?]+/g) || [currentUnit.text];
+        let index = 0;
+
+        function playNextSentence() {
+            if (index < sentences.length) {
+                const current = sentences[index].trim();
+                const display = document.getElementById('shadowing-display');
+                if (display) display.innerText = current;
+                playNaturalAudio(current);
+                index++;
+                setTimeout(playNextSentence, 4500);
+            } else {
+                // Restaurar botón al finalizar
+                processing.shadowing = false;
+                btn.disabled = false;
+                btn.classList.remove('opacity-50', 'cursor-not-allowed');
+                btn.innerHTML = '<i class="fa-solid fa-play"></i> Iniciar Rutina de Shadowing';
+            }
         }
+        playNextSentence();
+    } catch (e) {
+        console.error(e);
+        processing.shadowing = false;
+        btn.disabled = false;
+        btn.classList.remove('opacity-50', 'cursor-not-allowed');
+        btn.innerHTML = '<i class="fa-solid fa-play"></i> Iniciar Rutina de Shadowing';
     }
-    playNextSentence();
 }
 
 // --- REPETICIÓN ESPACIADA (SRS) ---
@@ -650,9 +788,15 @@ function playSRSWordAudio() {
 }
 
 async function submitSRSReview(success) {
-    if (srsDueWords.length === 0 || !srsDueWords[currentSRSIndex]) return;
-    const currentCard = srsDueWords[currentSRSIndex];
+    if (processing.srs) return;
+    processing.srs = true;
+    const btnNo = document.getElementById('btn-srs-no');
+    const btnYes = document.getElementById('btn-srs-yes');
+    [btnNo, btnYes].forEach(b => { b.disabled = true; b.classList.add('opacity-50', 'cursor-not-allowed'); });
+
     try {
+        if (srsDueWords.length === 0 || !srsDueWords[currentSRSIndex]) return;
+        const currentCard = srsDueWords[currentSRSIndex];
         const res = await fetch(`${API_BASE_URL}/api/srs/review`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
@@ -663,8 +807,16 @@ async function submitSRSReview(success) {
             renderSRSCard();
             fetchSRSStats();
             if (success) updateUserXP(10);
+        } else {
+            throw new Error('Error al enviar revisión');
         }
-    } catch (err) { console.error("Error SRS review:", err); }
+    } catch (err) {
+        console.error("Error SRS review:", err);
+        Swal.fire({ icon: 'error', title: 'Error', text: 'No se pudo registrar la revisión.' });
+    } finally {
+        processing.srs = false;
+        [btnNo, btnYes].forEach(b => { b.disabled = false; b.classList.remove('opacity-50', 'cursor-not-allowed'); });
+    }
 }
 
 // --- IPA MATRIZ FONÉTICA ---
@@ -680,8 +832,6 @@ async function fetchIPAMatrix() {
     } catch (err) { console.error("Error IPA:", err); }
 }
 
-// Mapa de color por tipo de fonema — evita repetir clases y mantiene
-// consistencia visual entre vocales, diptongos y consonantes.
 const IPA_TYPE_COLORS = {
     "Long Vowel": "bg-cyan-100 text-cyan-800 dark:bg-cyan-900/50 dark:text-cyan-300",
     "Short Vowel": "bg-sky-100 text-sky-800 dark:bg-sky-900/50 dark:text-sky-300",
@@ -699,7 +849,6 @@ function renderPhonemeCategory(containerId, items) {
   if (!grid) return;
 
   grid.innerHTML = items.map((item, index) => {
-    // Recortar textos largos para la vista previa
     const truncate = (str, max) => str.length > max ? str.slice(0, max) + '…' : str;
     const shortHint = truncate(item.spanish_equivalent_or_hack, 300);
     const shortError = truncate(item.common_error_spanish, 300);
@@ -711,43 +860,36 @@ function renderPhonemeCategory(containerId, items) {
            data-index="${index}"
            onclick="playNaturalAudio('${item.example}')">
         
-        <!-- Fila superior: símbolo + ejemplo + transcripción -->
         <div class="flex flex-col items-center text-center gap-1 p-2">
             <span class="text-3xl font-mono font-bold text-cyan-700 dark:text-cyan-400 group-hover:scale-110 transition-transform origin-left">/${item.symbol}/</span>
             <span class="text-base font-medium text-slate-700 dark:text-slate-200">${item.example}</span>
             <span class="text-xs text-slate-400 dark:text-slate-500 font-mono">${item.ipa_ex}</span>
         </div>
 
-        <!-- Tipo -->
         <div class="mt-1 text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider ">${item.type}</div>
 
-        <!-- Common spellings (badges) -->
         <div class="mt-3 flex flex-wrap gap-1.5">
           ${item.common_spellings.map(sp => 
             `<span class="px-2.5 py-0.5 bg-cyan-100 dark:bg-cyan-900/40 text-cyan-800 dark:text-cyan-300 text-[11px] rounded-full font-mono border border-cyan-200 dark:border-cyan-800">${sp}</span>`
           ).join('')}
         </div>
 
-        <!-- Minimal pairs (con icono FA) -->
         <div class="mt-3 text-xs text-slate-600 dark:text-slate-300">
           <i class="fa-solid fa-arrows-rotate text-slate-500 dark:text-slate-400 text-xs mr-1"></i>
           <span class="font-semibold">Contrasta con:</span>
           <span class="ml-1">${item.minimal_pairs.join(' · ')}</span>
         </div>
 
-        <!-- Truco / hack (resumen) con icono FA -->
         <div class="mt-2 text-xs text-slate-600 dark:text-slate-300 italic line-clamp-2">
           <i class="fa-regular fa-lightbulb text-amber-400 dark:text-amber-300 text-xs mr-1.5"></i>
           ${shortHint}
         </div>
 
-        <!-- Error común (resumen) con icono FA -->
         <div class="mt-1 text-[11px] text-rose-600 dark:text-rose-400 line-clamp-1">
           <i class="fa-solid fa-triangle-exclamation text-rose-500 dark:text-rose-400 text-[10px] mr-1.5"></i>
           ${shortError}
         </div>
 
-        <!-- Botón para expandir (toggle) con iconos FA -->
         <div class="mt-3 text-center">
           <button onclick="event.stopPropagation(); toggleDetails(this, ${index})" 
                   class="text-[11px] font-medium text-cyan-600 dark:text-cyan-400 hover:underline focus:outline-none flex items-center justify-center gap-1.5 w-full">
@@ -756,7 +898,6 @@ function renderPhonemeCategory(containerId, items) {
           </button>
         </div>
 
-        <!-- Contenedor de detalles ocultos (se expande) -->
         <div id="details-${index}" class="hidden mt-3 pt-3 border-t border-slate-200 dark:border-slate-700 text-xs text-slate-600 dark:text-slate-300 space-y-2">
           <div>
             <i class="fa-regular fa-lightbulb text-amber-400 dark:text-amber-300 text-xs mr-1.5"></i>
@@ -779,7 +920,6 @@ function renderPhonemeCategory(containerId, items) {
     `;
   }).join("");
 
-  // Función toggle (se declara global para usarse desde el onclick)
   window.toggleDetails = function(btn, index) {
     const details = document.getElementById(`details-${index}`);
     if (details) {
@@ -806,7 +946,6 @@ async function initRoleplayModule() {
         if (!res.ok) return;
         const scenarios = await res.json();
         
-        // Mapeo por ID para evitar JSON.stringify dentro del HTML
         roleplayScenariosMap = {};
         scenarios.forEach(sc => { roleplayScenariosMap[sc.id] = sc; });
         
@@ -879,7 +1018,6 @@ function appendRPMessage(sender, text, feedback = null) {
     container.scrollTop = container.scrollHeight;
 }
 
-// Renderiza las sugerencias dinámicas usando type="button"
 function renderRPSuggestions(replies) {
     const box = document.getElementById("rp-suggestions");
     if (!box) return;
@@ -891,29 +1029,6 @@ function renderRPSuggestions(replies) {
     }
 
     box.classList.remove("hidden");
-    box.innerHTML = replies.map(r => `
-        <button 
-            type="button" 
-            onclick="useRPSuggestion('${r.replace(/'/g, "\\'")}', event)" 
-            class="bg-slate-100 dark:bg-slate-700 hover:bg-indigo-50 dark:hover:bg-indigo-950/60 hover:text-indigo-700 dark:hover:text-indigo-300 text-slate-700 dark:text-slate-200 px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-600 transition font-medium text-left"
-        >
-            💡 "${r}"
-        </button>
-    `).join("");
-}
-
-function renderRPSuggestions(replies) {
-    const box = document.getElementById("rp-suggestions");
-    if (!box) return;
-
-    if (!replies || replies.length === 0) {
-        box.innerHTML = "";
-        box.classList.add("hidden");
-        return;
-    }
-
-    box.classList.remove("hidden");
-    // Se usa encodeURIComponent para evitar que comillas o apóstrofes rompan el HTML
     box.innerHTML = replies.map(r => `
         <button 
             type="button" 
@@ -928,19 +1043,16 @@ function renderRPSuggestions(replies) {
 
 function useRPSuggestionFromData(btnEl, e) {
     if (e) {
-        if (typeof e.preventDefault === "function") e.preventDefault();
-        if (typeof e.stopPropagation === "function") e.stopPropagation();
+        e.preventDefault();
+        e.stopPropagation();
     }
-
     const rawText = btnEl.getAttribute("data-reply");
     if (!rawText) return;
-
     const text = decodeURIComponent(rawText);
     const input = document.getElementById("rp-transcript-input");
     if (input) {
         input.value = text;
     }
-    
     sendRoleplayMessage(e);
 }
 
@@ -993,20 +1105,26 @@ function toggleRoleplayMic() {
 
 async function sendRoleplayMessage(e) {
     if (e) {
-        if (typeof e.preventDefault === "function") e.preventDefault();
-        if (typeof e.stopPropagation === "function") e.stopPropagation();
+        e.preventDefault();
+        e.stopPropagation();
     }
-
-    const input = document.getElementById("rp-transcript-input");
-    if (!input) return;
-    const userText = input.value.trim();
-    if (!userText || !currentScenario) return;
-
-    appendRPMessage("user", userText);
-    roleplayHistory.push({ role: "user", content: userText });
-    input.value = "";
+    if (processing.roleplay) return;
+    processing.roleplay = true;
+    const btn = document.getElementById('btn-send-rp');
+    btn.disabled = true;
+    btn.classList.add('opacity-50', 'cursor-not-allowed');
+    btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i>';
 
     try {
+        const input = document.getElementById("rp-transcript-input");
+        if (!input) return;
+        const userText = input.value.trim();
+        if (!userText || !currentScenario) return;
+
+        appendRPMessage("user", userText);
+        roleplayHistory.push({ role: "user", content: userText });
+        input.value = "";
+
         const res = await fetch(`${API_BASE_URL}/api/roleplay/respond`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
@@ -1024,37 +1142,33 @@ async function sendRoleplayMessage(e) {
             roleplayHistory.push({ role: "assistant", content: data.bot_reply });
             updateUserXP(10);
         } else {
-            // FIX: antes, si el backend respondía con un status de error
-            // (4xx/5xx), no pasaba nada visible: `res.ok` era false y el
-            // bloque simplemente no hacía nada. El usuario veía la interfaz
-            // "colgada" sin ningún mensaje, indistinguible de un fallo real
-            // del LLM devolviendo la respuesta genérica.
             console.error("Error Roleplay: respuesta no OK", res.status);
             appendRPMessage("bot", "Ups, hubo un problema de conexión con el tutor. Intenta de nuevo en unos segundos.");
         }
     } catch (err) {
         console.error("Error Roleplay:", err);
         appendRPMessage("bot", "Ups, hubo un problema de conexión con el tutor. Intenta de nuevo en unos segundos.");
+        Swal.fire({ icon: 'error', title: 'Error', text: 'No se pudo enviar el mensaje.' });
+    } finally {
+        processing.roleplay = false;
+        btn.disabled = false;
+        btn.classList.remove('opacity-50', 'cursor-not-allowed');
+        btn.innerHTML = '<i class="fa-solid fa-paper-plane"></i>';
     }
 }
 
-// Función para seleccionar e inmediatamente enviar una sugerencia
 function selectSuggestedResponse(text, e) {
     if (e) {
-        if (typeof e.preventDefault === "function") e.preventDefault();
-        if (typeof e.stopPropagation === "function") e.stopPropagation();
+        e.preventDefault();
+        e.stopPropagation();
     }
-
     const input = document.getElementById("rp-transcript-input");
     if (input) {
         input.value = text;
     }
-    
-    // Ejecutamos el envío pasando el evento
     sendRoleplayMessage(e);
 }
 
-// Renderizado de las opciones/sugerencias de respuesta en el Roleplay
 function renderRoleplaySuggestions(suggestions) {
     const container = document.getElementById("rp-suggestions-container");
     if (!container) return;
@@ -1066,7 +1180,6 @@ function renderRoleplaySuggestions(suggestions) {
     }
 
     container.classList.remove("hidden");
-    // IMPORTANTE: type="button" explícito y pasa (event) en el onclick
     container.innerHTML = suggestions.map(sug => `
         <button 
             type="button" 
@@ -1143,6 +1256,13 @@ function selectPlacementOption(optIdx) {
 
 async function submitPlacementAnswer() {
     if (ptState.selectedOption === null) return;
+    if (processing.placement) return;
+    processing.placement = true;
+    const btn = document.getElementById('pt-next-btn');
+    btn.disabled = true;
+    btn.classList.add('opacity-50', 'cursor-not-allowed');
+    btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Enviando...';
+
     try {
         const res = await fetch(`${API_BASE_URL}/api/placement/next`, {
             method: "POST",
@@ -1163,8 +1283,18 @@ async function submitPlacementAnswer() {
                 ptState.history = data.history;
                 renderPlacementQuestion(data);
             }
+        } else {
+            throw new Error('Error al enviar respuesta');
         }
-    } catch (err) { console.error(err); }
+    } catch (err) {
+        console.error(err);
+        Swal.fire({ icon: 'error', title: 'Error', text: 'No se pudo enviar la respuesta.' });
+    } finally {
+        processing.placement = false;
+        btn.disabled = false;
+        btn.classList.remove('opacity-50', 'cursor-not-allowed');
+        btn.innerHTML = 'Siguiente Pregunta';
+    }
 }
 
 function renderPlacementResult(data) {
@@ -1265,8 +1395,7 @@ function loadUnitPractice(unitId) {
         currentUnit = allUnitsMap[unitId];
         renderCurrentUnit();
         window.scrollTo({ top: 300, behavior: 'smooth' });
-    }else {
-        // Este caso no debería ocurrir, pero por si acaso
+    } else {
         Swal.fire({
             icon: 'error',
             title: 'Unidad no encontrada',
@@ -1278,23 +1407,22 @@ function loadUnitPractice(unitId) {
 
 // --- GESTIÓN DE PESTAÑAS (TABS) ---
 function switchTab(tabName) {
+    // Ocultar todas las secciones
     document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));
-    document.querySelectorAll('.tab-btn').forEach(btn => {
-        if (btn.id === 'tab-challenge') {
-            btn.className = 'tab-btn bg-amber-600 hover:bg-amber-700 text-white p-3.5 px-5 rounded-xl shadow-sm font-bold flex items-center justify-center gap-2 transition';
-        } else {
-            btn.className = 'tab-btn bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700 p-3.5 px-5 rounded-xl shadow-sm hover:bg-slate-100 dark:hover:bg-slate-700 font-semibold flex items-center justify-center gap-2 transition';
+
+    // Mostrar la sección activa
+    const activeSection = document.getElementById(`sec-${tabName}`);
+    if (activeSection) activeSection.classList.remove('hidden');
+
+    // Resaltar el ítem en el menú
+    document.querySelectorAll('#main-menu a[data-tab]').forEach(link => {
+        link.classList.remove('bg-indigo-50', 'dark:bg-indigo-950/50', 'border-l-4', 'border-indigo-500');
+        if (link.dataset.tab === tabName) {
+            link.classList.add('bg-indigo-50', 'dark:bg-indigo-950/50', 'border-l-4', 'border-indigo-500');
         }
     });
 
-    const activeSection = document.getElementById(`sec-${tabName}`);
-    const activeTabBtn = document.getElementById(`tab-${tabName}`);
-
-    if (activeSection) activeSection.classList.remove('hidden');
-    if (activeTabBtn && tabName !== 'challenge') {
-        activeTabBtn.className = 'tab-btn bg-indigo-600 text-white p-3.5 px-5 rounded-xl shadow-sm font-semibold flex items-center justify-center gap-2 transition';
-    }
-
+    // Cargar datos específicos de cada sección
     switch (tabName) {
         case 'srs': fetchSRSStats(); fetchSRSDueWords(); break;
         case 'ipa-matrix': fetchIPAMatrix(); break;
