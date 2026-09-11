@@ -61,28 +61,12 @@ const processing = {
 // --- 1. INICIALIZACIÓN ---
 document.addEventListener("DOMContentLoaded", async () => {
     initDarkMode();
+    setupSpeechRecognition();
 
-    // Verificación automática de sesión activa con Supabase
+    // Verificación y restauración automática de sesión con Supabase
     await checkAutoLogin();
 
-    // VERIFICACIÓN DE SESIÓN
-    if (!authToken) {
-        showLoginModal();
-    } else {
-        initializeApp();
-    }
-
-    setupSpeechRecognition();
-    fetchSRSStats();
-    fetchSRSDueWords();
-    fetchUserStats();
-    fetchProgressData();
-    fetchDailyChallenge();
-    initWaveform();
-
-    const savedUser = localStorage.getItem("username") || "Estudiante";
-    updateNavUserProfile(savedUser);
-
+    // Event listener para el textarea de writing
     const writingInput = document.getElementById("writing-input");
     if (writingInput) {
         writingInput.addEventListener("keydown", (e) => {
@@ -97,47 +81,53 @@ document.addEventListener("DOMContentLoaded", async () => {
     const menuToggle = document.getElementById("menu-toggle");
     const mainMenu = document.getElementById("main-menu");
 
-    menuToggle.addEventListener("click", (e) => {
-        e.stopPropagation();
-        mainMenu.classList.toggle("hidden");
-    });
-
-    document.querySelectorAll("#main-menu a[data-tab]").forEach((link) => {
-        link.addEventListener("click", (e) => {
-            e.preventDefault();
-            const tab = link.dataset.tab;
-            switchTab(tab);
-            mainMenu.classList.add("hidden");
+    if (menuToggle && mainMenu) {
+        menuToggle.addEventListener("click", (e) => {
+            e.stopPropagation();
+            mainMenu.classList.toggle("hidden");
         });
-    });
 
-    document.addEventListener("click", (e) => {
-        if (
-            !mainMenu.contains(e.target) &&
-            e.target !== menuToggle &&
-            !menuToggle.contains(e.target)
-        ) {
-            mainMenu.classList.add("hidden");
-        }
-    });
+        document.querySelectorAll("#main-menu a[data-tab]").forEach((link) => {
+            link.addEventListener("click", (e) => {
+                e.preventDefault();
+                const tab = link.dataset.tab;
+                switchTab(tab);
+                mainMenu.classList.add("hidden");
+            });
+        });
+
+        document.addEventListener("click", (e) => {
+            if (
+                !mainMenu.contains(e.target) &&
+                e.target !== menuToggle &&
+                !menuToggle.contains(e.target)
+            ) {
+                mainMenu.classList.add("hidden");
+            }
+        });
+    }
 });
 
 async function checkAutoLogin() {
     try {
-        // Supabase comprueba el almacenamiento local y refresca el token si venció
+        // Supabase verifica el storage y refresca automáticamente el token si venció
         const { data: { session }, error } = await supabaseClient.auth.getSession();
 
-        if (session && !error) {
-            // Sesión válida: actualizamos variables y cargamos la app
+        if (session && session.access_token && !error) {
+            // Sesión válida o refrescada exitosamente
             authToken = session.access_token;
             currentUsername = session.user.email;
             localStorage.setItem("auth_token", authToken);
             localStorage.setItem("current_username", currentUsername);
 
+            if (!localStorage.getItem("username")) {
+                localStorage.setItem("username", session.user.email.split("@")[0]);
+            }
+
             hideLoginModal();
-            initializeApp();
+            initializeApp(); // Carga la app UNA SOLA VEZ con el token refrescado
         } else {
-            // No hay sesión o está expirada
+            // No hay sesión activa
             clearSessionStorage();
             showLoginModal();
         }
@@ -1018,13 +1008,16 @@ async function fetchSRSDueWords() {
 
 //localStorage.clear();
 
-async function conectarConServidorRender(endpoint) {
+async function conectarConServidorRender(endpoint, showLoading = false) {
     if (!authToken) {
         console.error("No se encontró token de autenticación.");
+        showLoginModal();
         return { ok: false, status: 401 };
     }
 
-    showLoadingAlert("Conectando con el servidor de Render", "Sincronizando con el servidor...");
+    if (showLoading) {
+        showLoadingAlert("Conectando con el servidor", "Sincronizando datos...");
+    }
 
     try {
         const response = await fetch(`${API_BASE_URL}${endpoint}`, {
@@ -1033,17 +1026,19 @@ async function conectarConServidorRender(endpoint) {
         });
 
         if (response.status === 401) {
-            console.error("Sesión expirada o no autorizada.");
+            console.error("Sesión expirada o no autorizada (401).");
             handleLogout();
+            return { ok: false, status: 401 };
         }
 
-        return response; // Devuelve el objeto Response completo
+        return response;
     } catch (error) {
         console.error("Error de conexión con la API:", error);
         return { ok: false, status: 500 };
-    }
-    finally {
-        hideLoadingAlert();
+    } finally {
+        if (showLoading) {
+            hideLoadingAlert();
+        }
     }
 }
 
@@ -1917,18 +1912,21 @@ async function handleLogout() {
     }
 }
 
-// Envuelve las llamadas iniciales para ejecutarlas SÓLO tras iniciar sesión
+// Envuelve las llamadas iniciales para ejecutarlas SÓLO tras confirmar la sesión activa
 function initializeApp() {
+    const savedUser = localStorage.getItem("username") || localStorage.getItem("current_username") || "Estudiante";
+    updateNavUserProfile(savedUser);
+
     fetchCurriculum();
-    setupSpeechRecognition();
     fetchSRSStats();
     fetchSRSDueWords();
-    // Encanenamos las estadísticas primero para asegurar que tenemos el NIVEL antes de pedir los desafíos
+    initWaveform();
+
+    // Encadenamos estadísticas para asegurar el NIVEL antes de pedir desafíos
     fetchUserStats().then(() => {
         fetchProgressData();
         fetchDailyChallenge();
     });
-    initWaveform();
 }
 
 // --- ACTUALIZAR PERFIL DE USUARIO EN NAVBAR ---
