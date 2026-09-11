@@ -80,6 +80,9 @@ document.addEventListener("DOMContentLoaded", async () => {
     fetchDailyChallenge();
     initWaveform();
 
+    const savedUser = localStorage.getItem("username") || "Estudiante";
+    updateNavUserProfile(savedUser);
+
     const writingInput = document.getElementById("writing-input");
     if (writingInput) {
         writingInput.addEventListener("keydown", (e) => {
@@ -1869,6 +1872,11 @@ async function handleLogin(e) {
     const errorText = document.getElementById("login-error");
     const email = document.getElementById("login-username").value; // ahora es email
     const password = document.getElementById("login-password").value;
+    const username = document.getElementById("login-username").value;
+
+    localStorage.setItem("username", username);
+    console.warn("Guardando username en localStorage:", username);
+    updateNavUserProfile(username);
 
     btn.disabled = true;
     btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Conectando...';
@@ -1915,12 +1923,32 @@ function initializeApp() {
     setupSpeechRecognition();
     fetchSRSStats();
     fetchSRSDueWords();
-    // Encamenamos las estadísticas primero para asegurar que tenemos el NIVEL antes de pedir los desafíos
+    // Encanenamos las estadísticas primero para asegurar que tenemos el NIVEL antes de pedir los desafíos
     fetchUserStats().then(() => {
         fetchProgressData();
         fetchDailyChallenge();
     });
     initWaveform();
+}
+
+// --- ACTUALIZAR PERFIL DE USUARIO EN NAVBAR ---
+function updateNavUserProfile(username, level = "A1") {
+    const usernameElem = document.getElementById("nav-username");
+    const avatarElem = document.getElementById("nav-user-avatar");
+    const levelElem = document.getElementById("nav-user-level-badge");
+
+    if (usernameElem) {
+        usernameElem.textContent = username || "Usuario";
+    }
+
+    if (levelElem) {
+        levelElem.textContent = `Nivel: ${level}`;
+    }
+
+    if (avatarElem && username) {
+        // Genera un avatar automático con las iniciales del usuario usando UI-Avatars
+        avatarElem.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(username)}&background=4f46e5&color=fff&bold=true&length=2`;
+    }
 }
 
 // Muestra el modal de carga bloqueando clics externos

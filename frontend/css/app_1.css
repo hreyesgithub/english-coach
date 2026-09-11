@@ -87,3 +87,33 @@ header {
     position: relative;
     z-index: 50;
 }
+
+/* --- REGULACIÓN Y ESTILOS COMPACTOS DEL BADGE DE PERFIL --- */
+#user-profile-badge {
+    transition: background-color 0.2s ease, border-color 0.2s ease, transform 0.15s ease;
+    height: 32px; /* Altura fija contenida idéntica a los botones de control */
+}
+
+#user-profile-badge:hover {
+    background-color: rgba(67, 56, 202, 0.75);
+    border-color: rgba(255, 255, 255, 0.4);
+}
+
+.dark #user-profile-badge:hover {
+    background-color: rgba(30, 27, 75, 0.9);
+}
+
+#nav-user-avatar {
+    width: 22px;
+    height: 22px;
+}
+
+#nav-username {
+    font-size: 0.7rem; /* ~11px */
+    line-height: 1.1;
+}
+
+#nav-user-level-badge {
+    font-size: 0.58rem; /* ~9px */
+    line-height: 1;
+}

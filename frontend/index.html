@@ -106,27 +106,50 @@
                     </h1>
                 </div>
                 <!-- Badge de nivel y modo oscuro -->
-                <div class="flex items-center gap-4">
-                    <span
-                        id="nav-user-level-badge"
-                        class="text-xs bg-indigo-800 dark:bg-indigo-950 text-indigo-100 px-3.5 py-1.5 rounded-full font-bold border border-indigo-500/30">
-                        Nivel: A1
-                    </span>
+                <!-- Perfil del Usuario y Controles (Versión Compacta) -->
+                <div class="flex items-center gap-2 sm:gap-3">
+                    <!-- Componente de Usuario Logueado -->
+                    <div
+                        id="user-profile-badge"
+                        class="flex items-center gap-2 bg-indigo-700/50 dark:bg-indigo-950/70 px-2.5 py-1 rounded-full border border-indigo-400/30 shadow-inner">
+                        <img
+                            id="nav-user-avatar"
+                            src="https://ui-avatars.com/api/?name=User&background=4f46e5&color=fff&bold=true"
+                            alt="Avatar"
+                            class="w-6 h-6 rounded-full object-cover border border-white/50 shrink-0" />
+                        <div class="flex flex-col text-left justify-center">
+                            <span
+                                id="nav-username"
+                                class="text-[11px] font-bold text-white tracking-tight truncate max-w-[80px] sm:max-w-[120px] leading-tight">
+                                Cargando...
+                            </span>
+                            <span
+                                id="nav-user-level-badge"
+                                class="text-[9px] text-indigo-200 font-semibold leading-none opacity-90">
+                                Nivel: A1
+                            </span>
+                        </div>
+                    </div>
+
+                    <!-- Toggle Modo Oscuro -->
                     <button
                         id="dark-mode-toggle"
-                        class="text-white text-xl hover:text-indigo-200 transition p-1 rounded-lg focus:outline-none focus:ring-2 focus:ring-white/50"
+                        class="text-white text-lg hover:text-indigo-200 transition p-1.5 rounded-lg focus:outline-none"
                         aria-label="Cambiar Modo Oscuro">
                         <i class="fa-solid fa-moon"></i>
                     </button>
+
+                    <!-- Botón Cerrar Sesión -->
                     <button
                         id="logout-btn"
                         onclick="handleLogout()"
-                        class="text-white text-xl hover:text-rose-400 transition p-1 rounded-lg focus:outline-none"
+                        class="text-white text-lg hover:text-rose-300 transition p-1.5 rounded-lg focus:outline-none"
                         title="Cerrar Sesión">
                         <i class="fa-solid fa-right-from-bracket"></i>
                     </button>
                 </div>
             </div>
+
             <!-- Menú desplegable -->
             <div
                 id="main-menu"
