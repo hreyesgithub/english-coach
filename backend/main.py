@@ -4,6 +4,7 @@ import json
 import logging
 import os
 import re
+import time
 import tempfile
 import httpx
 from pathlib import Path
@@ -25,6 +26,7 @@ from fastapi import (
     Request,
     UploadFile,
     Depends,
+    status
 )
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, StreamingResponse
@@ -523,6 +525,34 @@ def health_check():
 def get_ipa_matrix():
     return IPA_PHONEMES
 
+@app.get("/health/supabase", tags=["System"])
+def supabase_health_check():
+    """Verifica la conectividad real y mide la latencia con la base de datos de Supabase."""
+    if not supabase:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Cliente de Supabase no instanciado. Revisa las variables SUPABASE_URL y SUPABASE_KEY."
+        )
+
+    start_time = time.time()
+    try:
+        # Consulta minimalista de 1 sola fila para verificar conexión activa con la BD
+        supabase.table("srs_words").select("id").limit(1).execute()
+        latency_ms = round((time.time() - start_time) * 1000, 2)
+
+        return {
+            "status": "healthy",
+            "database": "supabase",
+            "connected": True,
+            "latency": f"{latency_ms} ms",
+            "timestamp": datetime.now(timezone.utc).isoformat()
+        }
+    except Exception as e:
+        logger.error(f"Fallo en la prueba de vida de Supabase: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=f"Error de conexión con Supabase: {str(e)}"
+        )
 
 @app.get("/api/curriculum")
 def get_curriculum():
