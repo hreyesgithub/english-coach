@@ -7,7 +7,7 @@ import re
 import tempfile
 import httpx
 from pathlib import Path
-from datetime import date, datetime, timedelta
+from datetime import date, datetime, timedelta, timezone
 from typing import Any, List, Optional, cast, Dict
 
 import assemblyai as aai
@@ -508,6 +508,16 @@ async def startup_event():
 def read_root():
     return {"message": "¡Bienvenido al backend del Coach de Inglés!"}
 
+
+@app.get("/health", tags=["System"])
+def health_check():
+    """Endpoint de verificación de salud para Render y monitoreo externo."""
+    return {
+        "status": "healthy",
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "database": "connected" if supabase is not None else "disconnected",
+        "version": app.version
+    }
 
 @app.get("/api/ipa-matrix")
 def get_ipa_matrix():
