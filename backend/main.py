@@ -4,60 +4,79 @@ import json
 import logging
 import os
 import re
-import sqlite3
 import tempfile
 import httpx
 from pathlib import Path
 from datetime import date, datetime, timedelta
-from typing import List, Optional
+from typing import Any, List, Optional, cast, Dict
 
 import assemblyai as aai
 
 import edge_tts  # type: ignore
 import eng_to_ipa as ipa  # type: ignore
 from dotenv import load_dotenv
-from fastapi import FastAPI, File, Form, HTTPException, Query, Request, UploadFile
+from fastapi import (
+    FastAPI,
+    File,
+    Form,
+    Header,
+    HTTPException,
+    Query,
+    Request,
+    UploadFile,
+    Depends,
+)
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, StreamingResponse
 
-# from openai import OpenAI
-# from openai.types.chat import ChatCompletionMessageParam
 import google.generativeai as genai
 from pydantic import BaseModel
 from starlette.middleware.base import BaseHTTPMiddleware
 from uvicorn.protocols.utils import ClientDisconnected
+from supabase import create_client, Client
+
+from postgrest.types import CountMethod
 
 load_dotenv()
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("linguaboost")
 
-app = FastAPI(title="LinguaBoost Pro API", version="4.0.0")
+app = FastAPI(title="LinguaBoost Pro API", version="5.0.0")
+
+# --- CORS: restringido a orígenes explícitos (nunca "*" en producción) ---
+ALLOWED_ORIGINS = [
+    o.strip() for o in os.getenv("ALLOWED_ORIGINS", "").split(",") if o.strip()
+]
+if not ALLOWED_ORIGINS:
+    logger.warning(
+        "ALLOWED_ORIGINS no configurado: no se permitirá ningún origen por CORS."
+    )
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
-    # El backend no usa cookies ni sesiones (no hay login), así que no hace
-    # falta allow_credentials=True. Iba combinado con allow_origins=["*"],
-    # una mezcla que los navegadores tratan como violación del spec CORS y
-    # que Starlette "arregla" reflejando el Origin recibido: en la práctica
-    # equivale a aceptar cualquier origen con credenciales, más permisivo
-    # de lo necesario. Si en el futuro se necesitan cookies/auth, sustituir
-    # allow_origins=["*"] por la lista explícita de dominios del frontend.
-    allow_credentials=False,
-    allow_methods=["*"],
+    allow_origins=ALLOWED_ORIGINS,
+    allow_credentials=True,
+    allow_methods=["GET", "POST"],
     allow_headers=["*"],
 )
 
-# --- CONFIGURACIÓN DE LLM ---
-# OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
-# openai_client = OpenAI(api_key=OPENAI_API_KEY) if OPENAI_API_KEY else None
-# if not openai_client:
-#    logger.warning(
-#        "OPENAI_API_KEY no está configurada: el Roleplay funcionará en modo "
-#        "'fallback' con respuestas guionizadas, no con el LLM real."
-#    )
+# --- CONFIGURACIÓN DE SUPABASE ---
+SUPABASE_URL = os.getenv("SUPABASE_URL")
+SUPABASE_KEY = os.getenv(
+    "SUPABASE_KEY"
+)  # debe ser la SERVICE ROLE KEY (nunca expuesta al frontend)
+supabase: Optional[Client] = None
 
+if SUPABASE_URL and SUPABASE_KEY:
+    supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
+    logger.info("Cliente Supabase configurado correctamente.")
+else:
+    logger.warning(
+        "SUPABASE_URL o SUPABASE_KEY no configuradas en las variables de entorno."
+    )
+
+# --- CONFIGURACIÓN DE IA Y SERVICIOS ---
 ASSEMBLYAI_API_KEY = os.getenv("ASSEMBLYAI_API_KEY")
 if not ASSEMBLYAI_API_KEY:
     logger.warning(
@@ -68,6 +87,8 @@ else:
     logger.info("AssemblyAI configurado correctamente.")
 
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
+GEMINI_MODEL_NAME = os.getenv("GEMINI_MODEL_NAME", "gemini-1.5-flash")
+_gemini_model = None
 if GEMINI_API_KEY:
     genai.configure(api_key=GEMINI_API_KEY)  # type: ignore
     logger.info("Gemini configurado correctamente.")
@@ -76,62 +97,19 @@ else:
         "GEMINI_API_KEY no configurada: el Roleplay usará respuestas de respaldo."
     )
 
-# --- BASE DE DATOS SQLITE PARA REPETICIÓN ESPACIADA (SRS) ---
-DB_NAME = "srs_bank.db"
 
+def get_gemini_model(system_instruction: str):
+    """Crea (o reutiliza) el modelo Gemini con instrucción de sistema nativa."""
+    global _gemini_model
+    if _gemini_model is None and GEMINI_API_KEY:
+        _gemini_model = genai.GenerativeModel(  # type: ignore
+            GEMINI_MODEL_NAME,
+            system_instruction=system_instruction,
+        )
+    return _gemini_model
 
-def init_db():
-    conn = sqlite3.connect(DB_NAME)
-    cursor = conn.cursor()
-    cursor.execute("""
-        CREATE TABLE IF NOT EXISTS srs_words (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            word TEXT UNIQUE NOT NULL,
-            ipa TEXT NOT NULL,
-            level INTEGER DEFAULT 1,
-            next_review DATE NOT NULL,
-            times_failed INTEGER DEFAULT 1,
-            times_passed INTEGER DEFAULT 0
-        )
-    """)
-    cursor.execute("""
-        CREATE TABLE IF NOT EXISTS user_stats (
-            user_id TEXT PRIMARY KEY,
-            level INTEGER DEFAULT 1,
-            xp INTEGER DEFAULT 0,
-            streak INTEGER DEFAULT 0,
-            last_active DATE,
-            badges TEXT DEFAULT '[]'
-        )
-    """)
-    cursor.execute("""
-        CREATE TABLE IF NOT EXISTS daily_challenges (
-            date DATE PRIMARY KEY,
-            challenge_data TEXT
-        )
-    """)
-    cursor.execute("""
-        CREATE TABLE IF NOT EXISTS daily_progress (
-            user_id TEXT,
-            date DATE,
-            xp_gained INTEGER DEFAULT 0,
-            words_passed INTEGER DEFAULT 0,
-            roleplays_completed INTEGER DEFAULT 0,
-            PRIMARY KEY (user_id, date)
-        )
-    """)
-    conn.commit()
-    conn.close()
-
-
-init_db()
 
 # --- CARGA DE CONTENIDO DESDE ARCHIVOS JSON ---
-# El material de estudio (unidades, roleplays, preguntas de nivel, fonemas)
-# ya no vive hardcodeado en este archivo: se edita en /content/*.json sin
-# tocar código Python. load_content() centraliza la lectura y falla con un
-# mensaje claro si un archivo falta o tiene JSON inválido, en vez de tumbar
-# el arranque del servidor con un traceback críptico.
 CONTENT_DIR = Path(__file__).resolve().parent / "content"
 
 
@@ -141,51 +119,28 @@ def load_content(filename: str):
         with open(path, "r", encoding="utf-8") as f:
             return json.load(f)
     except FileNotFoundError:
-        raise RuntimeError(
-            f"No se encontró el archivo de contenido '{path}'. "
-            f"¿Falta crear/copiar {filename} en la carpeta content/?"
-        )
+        raise RuntimeError(f"No se encontró el archivo de contenido '{path}'.")
     except json.JSONDecodeError as e:
-        raise RuntimeError(
-            f"El archivo de contenido '{path}' tiene un error de sintaxis JSON: {e}"
-        )
+        raise RuntimeError(f"El archivo '{path}' tiene un error de sintaxis JSON: {e}")
 
 
-SRS_INTERVALS = {
-    1: 1,  # 1 día
-    2: 3,  # 3 días
-    3: 7,  # 7 días
-    4: 14,  # 14 días
-    5: 60,  # Dominada
-}
+SRS_INTERVALS = {1: 1, 2: 3, 3: 7, 4: 14, 5: 60}
 
-# --- CURRÍCULO COMPLETO BASADO EN EL MCER (CEFR A1 - C2) ---
-# --- CURRÍCULO COMPLETO BASADO EN EL MCER (A1-C2) — ver content/curriculum.json ---
 CURRICULUM = load_content("curriculum.json")
+IPA_PHONEMES = load_content("ipa_phonemes.json")
+ROLEPLAY_SCENARIOS = load_content("roleplay_scenarios.json")
+PLACEMENT_QUESTIONS = load_content("placement_questions.json")
+LEVEL_ORDER = ["A1", "A2", "B1", "B2", "C1", "C2"]
+
+MAX_TEXT_LEN = 500  # límite defensivo para endpoints de texto libre
 
 
 def seed_srs_from_curriculum():
-    """
-    Sincroniza el vocabulario de CURRICULUM con el banco SRS (srs_words).
-
-    Antes de este cambio, la lista "vocabulary" de cada unidad era solo
-    texto de referencia: nunca se insertaba en la base de datos, así que
-    esas palabras jamás aparecían en /api/srs/due-words ni eran
-    revisables en /api/srs/review (que además devuelve 404 si la palabra
-    no existe previamente en la tabla). Añadir una unidad nueva con
-    vocabulario nuevo no tenía ningún efecto en el sistema de repaso.
-
-    Esta función corre una vez al arrancar la app, recorre todo
-    CURRICULUM y usa INSERT OR IGNORE para dar de alta cualquier palabra
-    que todavía no esté en srs_words (columna UNIQUE), generando su
-    transcripción IPA automáticamente con la librería ya usada en
-    /api/get-ipa. Así, cualquier persona que añada contenido solo tiene
-    que tocar CURRICULUM: el resto es automático.
-    """
-    conn = sqlite3.connect(DB_NAME)
-    cursor = conn.cursor()
-    today = datetime.now().date()
-    inserted = 0
+    """Sincroniza el vocabulario del currículo directamente en Supabase."""
+    if not supabase:
+        return
+    today_str = datetime.now().date().isoformat()
+    words_to_upsert = []
 
     for level_data in CURRICULUM.values():
         for unit in level_data.get("units", []):
@@ -197,39 +152,27 @@ def seed_srs_from_curriculum():
                     ipa_transcription = f"/{ipa.convert(clean_word)}/"
                 except Exception:
                     ipa_transcription = ""
-                cursor.execute(
-                    """
-                    INSERT OR IGNORE INTO srs_words (word, ipa, level, next_review)
-                    VALUES (?, ?, 1, ?)
-                    """,
-                    (clean_word, ipa_transcription, today),
+
+                words_to_upsert.append(
+                    {
+                        "word": clean_word,
+                        "ipa": ipa_transcription,
+                        "level": 1,
+                        "next_review": today_str,
+                    }
                 )
-                inserted += cursor.rowcount
 
-    conn.commit()
-    conn.close()
-    if inserted:
-        logger.info(
-            "Seed SRS: %d palabra(s) nueva(s) añadida(s) desde CURRICULUM.", inserted
-        )
-
-
-seed_srs_from_curriculum()
-
-# --- BASE DE DATOS DE LOS 44 FONEMAS DEL IPA ---
-# --- BASE DE DATOS DE LOS 44 FONEMAS DEL IPA (content/ipa_phonemes.json) ---
-IPA_PHONEMES = load_content("ipa_phonemes.json")
-
-# --- MÓDULO ROLEPLAY CONVERSACIONAL ---
-ROLEPLAY_SCENARIOS = load_content("roleplay_scenarios.json")
-
-# --- BANCO DE PREGUNTAS DEL TEST ADAPTATIVO MCER ---
-PLACEMENT_QUESTIONS = load_content("placement_questions.json")
-
-LEVEL_ORDER = ["A1", "A2", "B1", "B2", "C1", "C2"]
+    if words_to_upsert:
+        try:
+            supabase.table("srs_words").upsert(
+                words_to_upsert, on_conflict="word", ignore_duplicates=True
+            ).execute()
+            logger.info("Seed SRS Supabase: Vocabulario sincronizado exitosamente.")
+        except Exception as e:
+            logger.error(f"Error al sembrar vocabulario en Supabase: {e}")
 
 
-# --- MODELOS PYDANTIC (COINCIDENTES CON PAYLOADS DEL FRONTEND) ---
+# --- MODELOS PYDANTIC ---
 class PronunciationEvaluationRequest(BaseModel):
     target_text: str
     spoken_text: str
@@ -258,7 +201,6 @@ class WritingCheckRequest(BaseModel):
 
 
 class CompleteChallengeRequest(BaseModel):
-    user_id: str = "default"
     mission_id: int = 1
 
 
@@ -268,7 +210,6 @@ class SuppressDisconnectMiddleware(BaseHTTPMiddleware):
         try:
             return await call_next(request)
         except ClientDisconnected:
-            print(f"ℹ️ Cliente desconectado prematuramente en: {request.url.path}")
             return JSONResponse(
                 status_code=499, content={"detail": "Client Closed Request"}
             )
@@ -277,114 +218,267 @@ class SuppressDisconnectMiddleware(BaseHTTPMiddleware):
 app.add_middleware(SuppressDisconnectMiddleware)
 
 
-# --- FUNCIONES AUXILIARES ---
-def get_user_stats(user_id: str = "default"):
-    conn = sqlite3.connect(DB_NAME)
-    c = conn.cursor()
-    c.execute(
-        "SELECT level, xp, streak, last_active, badges FROM user_stats WHERE user_id = ?",
-        (user_id,),
-    )
-    row = c.fetchone()
-    if not row:
-        c.execute(
-            "INSERT INTO user_stats (user_id, level, xp, streak, last_active, badges) VALUES (?, 1, 0, 0, ?, '[]')",
-            (user_id, date.today()),
+# --- AUTENTICACIÓN ---
+async def get_current_user(authorization: Optional[str] = Header(None)) -> str:
+    """
+    Deriva el user_id de un token de Supabase Auth verificado en el header
+    Authorization: Bearer <token>. Nunca confiar en un user_id enviado por
+    el cliente en query params o body.
+    """
+    if not supabase:
+        raise HTTPException(
+            status_code=503, detail="Servicio de autenticación no disponible."
         )
-        conn.commit()
-        row = (1, 0, 0, date.today(), "[]")
-    conn.close()
+    if not authorization or not authorization.lower().startswith("bearer "):
+        raise HTTPException(status_code=401, detail="Falta el token de autorización.")
+
+    token = authorization.split(" ", 1)[1].strip()
+    try:
+        user_response = supabase.auth.get_user(token)
+        user = getattr(user_response, "user", None)
+        if not user:
+            raise HTTPException(status_code=401, detail="Token inválido.")
+        return user.id
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.warning(f"Fallo de autenticación: {e}")
+        raise HTTPException(status_code=401, detail="Token inválido o expirado.")
+
+
+# --- FUNCIONES AUXILIARES CON SUPABASE ---
+def get_user_stats(user_id: str):
+    if not supabase:
+        return {
+            "level": 1,
+            "xp": 0,
+            "streak": 0,
+            "last_active": str(date.today()),
+            "badges": [],
+        }
+
+    try:
+        res = supabase.table("user_stats").select("*").eq("user_id", user_id).execute()
+    except Exception as e:
+        logger.error(f"Error Supabase (get_user_stats): {e}")
+        raise HTTPException(
+            status_code=503, detail="Servicio de base de datos no disponible."
+        )
+
+    if not res.data:
+        today_str = date.today().isoformat()
+        new_user = {
+            "user_id": user_id,
+            "level": 1,
+            "xp": 0,
+            "streak": 0,
+            "last_active": today_str,
+            "badges": [],
+        }
+        try:
+            supabase.table("user_stats").insert(new_user).execute()
+        except Exception as e:
+            logger.error(f"Error Supabase (insert user_stats): {e}")
+            raise HTTPException(
+                status_code=503, detail="No se pudo crear el perfil de usuario."
+            )
+        return new_user
+
+    row = cast(dict[str, Any], res.data[0])
+    if not isinstance(row, dict):
+        raise HTTPException(
+            status_code=500, detail="Formato de datos del usuario inválido."
+        )
+
+    badges = row.get("badges", [])
+    if isinstance(badges, str):
+        badges = json.loads(badges)
+
     return {
-        "level": row[0],
-        "xp": row[1],
-        "streak": row[2],
-        "last_active": row[3],
-        "badges": json.loads(row[4]),
+        "level": row.get("level", 1),
+        "xp": row.get("xp", 0),
+        "streak": row.get("streak", 0),
+        "last_active": row.get("last_active"),
+        "badges": badges,
     }
 
 
 def update_user_xp(user_id: str, xp_gain: int):
-    conn = sqlite3.connect(DB_NAME)
-    c = conn.cursor()
-    c.execute(
-        "SELECT xp, level, streak, last_active FROM user_stats WHERE user_id = ?",
-        (user_id,),
-    )
-    row = c.fetchone()
-    if not row:
-        conn.close()
-        return {"error": "User not found"}
-    new_xp = row[0] + xp_gain
-    new_level = row[1]
-    if new_xp >= 100 * new_level:
-        new_level += 1
-    today = date.today()
-    last_active = (
-        datetime.strptime(row[3], "%Y-%m-%d").date()
-        if row[3]
-        else today - timedelta(days=1)
-    )
-    streak = row[2]
-    if (today - last_active).days == 1:
-        streak += 1
-    elif (today - last_active).days > 1:
-        streak = 0
+    """
+    Incrementa el XP de forma atómica vía la función RPC `increment_xp`
+    (ver migración SQL). Esto evita condiciones de carrera del patrón
+    leer-calcular-escribir en Python.
+    """
+    if not supabase:
+        return {"xp": 0, "level": 1, "streak": 0}
 
-    c.execute(
-        "UPDATE user_stats SET xp = ?, level = ?, streak = ?, last_active = ? WHERE user_id = ?",
-        (new_xp, new_level, streak, today, user_id),
-    )
-    c.execute(
-        "INSERT INTO daily_progress (user_id, date, xp_gained) VALUES (?, ?, ?) ON CONFLICT(user_id, date) DO UPDATE SET xp_gained = xp_gained + ?",
-        (user_id, today, xp_gain, xp_gain),
-    )
-    conn.commit()
-    conn.close()
+    # Asegura que el usuario exista antes del RPC (crea fila si es la primera vez)
+    get_user_stats(user_id)
+
+    try:
+        rpc_res = supabase.rpc(
+            "increment_xp", {"p_user_id": user_id, "p_xp": xp_gain}
+        ).execute()
+    except Exception as e:
+        logger.error(f"Error Supabase (increment_xp RPC): {e}")
+        raise HTTPException(status_code=503, detail="No se pudo actualizar el XP.")
+
+    if not rpc_res.data:
+        raise HTTPException(
+            status_code=500, detail="Respuesta inesperada al actualizar XP."
+        )
+
+    raw_row = rpc_res.data[0] if isinstance(rpc_res.data, list) else rpc_res.data
+    if not isinstance(raw_row, dict):
+        raise HTTPException(
+            status_code=500, detail="Formato inesperado en la respuesta del XP."
+        )
+
+    xp_value = raw_row.get("xp", 0)
+    level_value = raw_row.get("level", 1)
+    streak_value = raw_row.get("streak", 0)
+    new_xp = int(xp_value) if isinstance(xp_value, (int, float, str)) else 0
+    new_level = int(level_value) if isinstance(level_value, (int, float, str)) else 1
+    streak = int(streak_value) if isinstance(streak_value, (int, float, str)) else 0
+
+    # Racha e historial diario (no crítico para consistencia de XP, se maneja aparte)
+    today = date.today()
+    today_str = today.isoformat()
+    try:
+        stats_res = (
+            supabase.table("user_stats")
+            .select("last_active, streak")
+            .eq("user_id", user_id)
+            .execute()
+        )
+        stats_row = (
+            stats_res.data[0]
+            if isinstance(stats_res.data, list) and stats_res.data
+            else None
+        )
+        if isinstance(stats_row, dict):
+            last_active_str = stats_row.get("last_active")
+            streak_value = stats_row.get("streak", 0)
+            prev_streak = (
+                int(streak_value) if isinstance(streak_value, (int, float, str)) else 0
+            )
+        else:
+            last_active_str = None
+            prev_streak = 0
+
+        last_active = (
+            datetime.strptime(last_active_str, "%Y-%m-%d").date()
+            if isinstance(last_active_str, str) and last_active_str
+            else today - timedelta(days=1)
+        )
+        if (today - last_active).days == 1:
+            streak = prev_streak + 1
+        elif (today - last_active).days > 1:
+            streak = 0
+        else:
+            streak = prev_streak
+
+        supabase.table("user_stats").update(
+            {"streak": streak, "last_active": today_str}
+        ).eq("user_id", user_id).execute()
+
+        dp_res = (
+            supabase.table("daily_progress")
+            .select("xp_gained")
+            .eq("user_id", user_id)
+            .eq("date", today_str)
+            .execute()
+        )
+        if dp_res.data:
+            dp_row = dp_res.data[0] if isinstance(dp_res.data, list) else dp_res.data
+            if isinstance(dp_row, dict):
+                xp_raw = dp_row.get("xp_gained", 0)
+                curr_xp = (
+                    int(xp_raw)
+                    if isinstance(xp_raw, (int, float, str))
+                    and not isinstance(xp_raw, bool)
+                    else 0
+                )
+            else:
+                curr_xp = 0
+            supabase.table("daily_progress").update(
+                {"xp_gained": curr_xp + xp_gain}
+            ).eq("user_id", user_id).eq("date", today_str).execute()
+        else:
+            supabase.table("daily_progress").insert(
+                {"user_id": user_id, "date": today_str, "xp_gained": xp_gain}
+            ).execute()
+    except Exception as e:
+        logger.error(f"Error Supabase (racha/progreso diario): {e}")
+        # No abortamos la respuesta por esto: el XP ya se guardó de forma atómica.
+
     return {"xp": new_xp, "level": new_level, "streak": streak}
 
 
-def update_daily_progress(user_id, words=0, roleplays=0):
-    conn = sqlite3.connect(DB_NAME)
-    c = conn.cursor()
-    today = date.today()
-    c.execute(
-        """
-        INSERT INTO daily_progress (user_id, date, words_passed, roleplays_completed)
-        VALUES (?, ?, ?, ?)
-        ON CONFLICT(user_id, date) DO UPDATE SET
-            words_passed = words_passed + ?,
-            roleplays_completed = roleplays_completed + ?
-    """,
-        (user_id, today, words, roleplays, words, roleplays),
-    )
-    conn.commit()
-    conn.close()
-
-
-def check_and_award_badges(user_id):
-    stats = get_user_stats(user_id)
-    badges = stats["badges"]
-    if stats["streak"] >= 7 and "streak_7" not in badges:
-        badges.append("streak_7")
-    conn = sqlite3.connect(DB_NAME)
-    c = conn.cursor()
-    c.execute(
-        "UPDATE user_stats SET badges = ? WHERE user_id = ?",
-        (json.dumps(badges), user_id),
-    )
-    conn.commit()
-    conn.close()
+def update_daily_progress(user_id: str, words: int = 0, roleplays: int = 0):
+    if not supabase:
+        return
+    today_str = date.today().isoformat()
+    try:
+        dp_res = (
+            supabase.table("daily_progress")
+            .select("*")
+            .eq("user_id", user_id)
+            .eq("date", today_str)
+            .execute()
+        )
+        if dp_res.data:
+            rec = dp_res.data[0]
+            if isinstance(rec, dict):
+                words_raw = rec.get("words_passed", 0)
+                roleplays_raw = rec.get("roleplays_completed", 0)
+                try:
+                    current_words = (
+                        int(words_raw)
+                        if isinstance(words_raw, (int, float, str))
+                        and not isinstance(words_raw, bool)
+                        else 0
+                    )
+                except (TypeError, ValueError):
+                    current_words = 0
+                try:
+                    current_roleplays = (
+                        int(roleplays_raw)
+                        if isinstance(roleplays_raw, (int, float, str))
+                        and not isinstance(roleplays_raw, bool)
+                        else 0
+                    )
+                except (TypeError, ValueError):
+                    current_roleplays = 0
+                supabase.table("daily_progress").update(
+                    {
+                        "words_passed": current_words + words,
+                        "roleplays_completed": current_roleplays + roleplays,
+                    }
+                ).eq("user_id", user_id).eq("date", today_str).execute()
+        else:
+            supabase.table("daily_progress").insert(
+                {
+                    "user_id": user_id,
+                    "date": today_str,
+                    "words_passed": words,
+                    "roleplays_completed": roleplays,
+                }
+            ).execute()
+    except Exception as e:
+        logger.error(f"Error Supabase (update_daily_progress): {e}")
 
 
 def calculate_final_level(history):
     level_weights = {"A1": 1, "A2": 2, "B1": 3, "B2": 4}
-    correct_levels = [level_weights[h["level"]] for h in history if h["correct"]]
-
+    correct_levels = [
+        level_weights[h["level"]]
+        for h in history
+        if h["correct"] and h["level"] in level_weights
+    ]
     if not correct_levels:
         return "A1"
-
     avg_score = sum(correct_levels) / len(correct_levels)
-
     if avg_score >= 3.5:
         return "B2"
     elif avg_score >= 2.5:
@@ -395,7 +489,16 @@ def calculate_final_level(history):
         return "A1"
 
 
-# --- ENDPOINTS GENERALES Y FONÉTICA ---
+# --- STARTUP: siembra diferida y protegida ---
+@app.on_event("startup")
+async def startup_event():
+    try:
+        seed_srs_from_curriculum()
+    except Exception as e:
+        logger.error(f"Fallo al sembrar SRS en el arranque: {e}")
+
+
+# --- ENDPOINTS GENERALES ---
 @app.get("/")
 def read_root():
     return {"message": "¡Bienvenido al backend del Coach de Inglés!"}
@@ -413,12 +516,13 @@ def get_curriculum():
 
 @app.get("/api/get-ipa")
 def get_ipa_transcription(
-    text: str = Query(..., description="Texto en inglés a convertir")
+    text: str = Query(
+        ..., max_length=MAX_TEXT_LEN, description="Texto en inglés a convertir"
+    )
 ):
     ipa_converted = ipa.convert(text)
     words = re.sub(r"[^\w\s]", "", text).split()
     words_detail = [{"word": w, "ipa": f"/{ipa.convert(w)}/"} for w in words]
-
     return {
         "original_text": text,
         "full_ipa": f"/{ipa_converted}/",
@@ -428,42 +532,33 @@ def get_ipa_transcription(
 
 @app.get("/api/tts-natural")
 async def text_to_speech_natural(
-    text: str = Query(..., description="Texto a sintetizar"),
-    voice: str = Query(
-        "en-US-AriaNeural", description="Voz de IA (en-US-AriaNeural o en-US-GuyNeural)"
-    ),
+    text: str = Query(..., max_length=MAX_TEXT_LEN),
+    voice: str = Query("en-US-AriaNeural"),
 ):
     try:
         clean_text = text.replace("'", "").replace("’", "")
         communicate = edge_tts.Communicate(clean_text, voice)
         audio_buffer = io.BytesIO()
-
         async for chunk in communicate.stream():
-            if chunk["type"] == "audio":
-                audio_data = chunk.get("data")
-                if audio_data is not None:
-                    audio_buffer.write(audio_data)
-
+            chunk_type = chunk.get("type")
+            chunk_data = chunk.get("data")
+            if chunk_type == "audio" and chunk_data:
+                audio_buffer.write(chunk_data)
         audio_buffer.seek(0)
         return StreamingResponse(audio_buffer, media_type="audio/mpeg")
     except Exception as e:
-        print(f"Error en Edge-TTS: {e}")
+        logger.error(f"Error en Edge-TTS: {e}")
         raise HTTPException(
-            status_code=503,
-            detail="El servicio de voz no está disponible temporalmente. Inténtalo de nuevo.",
+            status_code=503, detail="El servicio de voz no está disponible."
         )
 
 
-# --- ENDPOINT AÑADIDO: EVALUACIÓN DE PRONUNCIACIÓN (CORRESPONDENCIA FRONTEND) ---
 @app.post("/api/evaluate-pronunciation")
 def evaluate_pronunciation(data: PronunciationEvaluationRequest):
-    """Evalúa la coincidencia fonética entre la frase objetivo y el texto reconocido."""
     target = data.target_text.lower().strip()
     spoken = data.spoken_text.lower().strip()
-
     matcher = difflib.SequenceMatcher(None, target, spoken)
     ratio = round(matcher.ratio() * 100, 1)
-
     return {
         "target_text": data.target_text,
         "spoken_text": data.spoken_text,
@@ -472,87 +567,92 @@ def evaluate_pronunciation(data: PronunciationEvaluationRequest):
         "feedback": (
             "¡Excelente pronunciación!"
             if ratio >= 85
-            else "Buena articulación, pero intenta vocalizar con mayor claridad."
+            else "Buena articulación, pero vocaliza más claro."
         ),
     }
 
 
-# --- ENDPOINTS DEL SISTEMA SRS ---
+# --- ENDPOINTS DEL SISTEMA SRS (SUPABASE) — requieren usuario autenticado ---
 @app.get("/api/srs/due-words")
-def get_due_words():
-    today = datetime.now().date()
-    conn = sqlite3.connect(DB_NAME)
-    cursor = conn.cursor()
-    cursor.execute(
-        """
-        SELECT id, word, ipa, level, times_failed, times_passed 
-        FROM srs_words 
-        WHERE next_review <= ? 
-        ORDER BY level ASC, times_failed DESC
-    """,
-        (today,),
-    )
-    rows = cursor.fetchall()
-    conn.close()
-
-    words = [
-        {
-            "id": r[0],
-            "word": r[1],
-            "ipa": r[2],
-            "level": r[3],
-            "times_failed": r[4],
-            "times_passed": r[5],
-        }
-        for r in rows
-    ]
-    return {"due_words": words, "count": len(words)}
+def get_due_words(user_id: str = Depends(get_current_user)):
+    if not supabase:
+        return {"due_words": [], "count": 0}
+    today_str = datetime.now().date().isoformat()
+    try:
+        res = (
+            supabase.table("srs_words")
+            .select("id, word, ipa, level, times_failed, times_passed")
+            .lte("next_review", today_str)
+            .order("level", desc=False)
+            .order("times_failed", desc=True)
+            .execute()
+        )
+    except Exception as e:
+        logger.error(f"Error Supabase (due-words): {e}")
+        raise HTTPException(
+            status_code=503, detail="Servicio de base de datos no disponible."
+        )
+    return {"due_words": res.data, "count": len(res.data)}
 
 
 @app.post("/api/srs/review")
-def review_srs_word(data: SRSReviewRequest):
-    word = data.word.lower()
+def review_srs_word(data: SRSReviewRequest, user_id: str = Depends(get_current_user)):
+    if not supabase:
+        raise HTTPException(status_code=500, detail="Supabase no inicializado.")
+    word = data.word.lower().strip()
     today = datetime.now().date()
 
-    conn = sqlite3.connect(DB_NAME)
-    cursor = conn.cursor()
-    cursor.execute("SELECT level FROM srs_words WHERE word = ?", (word,))
-    row = cursor.fetchone()
+    try:
+        res = (
+            supabase.table("srs_words")
+            .select("level, times_passed, times_failed")
+            .eq("word", word)
+            .execute()
+        )
+    except Exception as e:
+        logger.error(f"Error Supabase (review select): {e}")
+        raise HTTPException(
+            status_code=503, detail="Servicio de base de datos no disponible."
+        )
 
-    if not row:
-        conn.close()
+    if not res.data:
         raise HTTPException(
             status_code=404, detail="Palabra no encontrada en el banco SRS"
         )
 
-    current_level = row[0]
-
-    if data.success:
-        new_level = min(current_level + 1, 5)
-        days_to_add = SRS_INTERVALS[new_level]
-        next_review = today + timedelta(days=days_to_add)
-        cursor.execute(
-            """
-            UPDATE srs_words 
-            SET level = ?, next_review = ?, times_passed = times_passed + 1
-            WHERE word = ?
-        """,
-            (new_level, next_review, word),
-        )
-    else:
-        new_level = 1
-        next_review = today
-        cursor.execute(
-            """
-            UPDATE srs_words 
-            SET level = 1, next_review = ?, times_failed = times_failed + 1
-            WHERE word = ?
-        """,
-            (today, word),
+    row_data = res.data[0]
+    if not isinstance(row_data, dict):
+        raise HTTPException(
+            status_code=500, detail="Formato inválido del registro SRS."
         )
 
-    conn.commit()
-    conn.close()
+    row = cast(dict[str, Any], row_data)
+    current_level = int(row.get("level", 1) or 1)
+
+    try:
+        if data.success:
+            new_level = min(current_level + 1, 5)
+            next_review = (today + timedelta(days=SRS_INTERVALS[new_level])).isoformat()
+            supabase.table("srs_words").update(
+                {
+                    "level": new_level,
+                    "next_review": next_review,
+                    "times_passed": int(row.get("times_passed", 0) or 0) + 1,
+                }
+            ).eq("word", word).execute()
+        else:
+            new_level = 1
+            next_review = today.isoformat()
+            supabase.table("srs_words").update(
+                {
+                    "level": 1,
+                    "next_review": next_review,
+                    "times_failed": int(row.get("times_failed", 0) or 0) + 1,
+                }
+            ).eq("word", word).execute()
+    except Exception as e:
+        logger.error(f"Error Supabase (review update): {e}")
+        raise HTTPException(status_code=503, detail="No se pudo actualizar la palabra.")
 
     return {
         "word": word,
@@ -564,24 +664,45 @@ def review_srs_word(data: SRSReviewRequest):
 
 @app.get("/api/srs/stats")
 def get_srs_stats():
-    today = datetime.now().date()
-    conn = sqlite3.connect(DB_NAME)
-    cursor = conn.cursor()
+    if not supabase:
+        return {"total_words": 0, "due_today": 0, "mastered_words": 0}
+    today_str = datetime.now().date().isoformat()
+    try:
+        res_total = (
+            supabase.table("srs_words").select("id", count=CountMethod.exact).execute()
+        )
+        res_due = (
+            supabase.table("srs_words")
+            .select("id", count=CountMethod.exact)
+            .lte("next_review", today_str)
+            .execute()
+        )
+        res_mastered = (
+            supabase.table("srs_words")
+            .select("id", count=CountMethod.exact)
+            .eq("level", 5)
+            .execute()
+        )
+    except Exception as e:
+        logger.error(f"Error Supabase (srs stats): {e}")
+        raise HTTPException(
+            status_code=503, detail="Servicio de base de datos no disponible."
+        )
 
-    cursor.execute("SELECT COUNT(*) FROM srs_words")
-    total = cursor.fetchone()[0]
+    return {
+        "total_words": (
+            res_total.count if res_total.count is not None else len(res_total.data)
+        ),
+        "due_today": res_due.count if res_due.count is not None else len(res_due.data),
+        "mastered_words": (
+            res_mastered.count
+            if res_mastered.count is not None
+            else len(res_mastered.data)
+        ),
+    }
 
-    cursor.execute("SELECT COUNT(*) FROM srs_words WHERE next_review <= ?", (today,))
-    due = cursor.fetchone()[0]
 
-    cursor.execute("SELECT COUNT(*) FROM srs_words WHERE level = 5")
-    mastered = cursor.fetchone()[0]
-
-    conn.close()
-    return {"total_words": total, "due_today": due, "mastered_words": mastered}
-
-
-# --- ENDPOINTS DE ROLEPLAY Y PLACEMENT TEST ---
+# --- ROLEPLAY & PLACEMENT TEST ---
 @app.get("/api/roleplay/scenarios")
 def get_roleplay_scenarios():
     return ROLEPLAY_SCENARIOS
@@ -592,33 +713,21 @@ async def roleplay_respond(data: RoleplayMessageRequest, request: Request):
     if await request.is_disconnected():
         return {"status": "cancelled"}
 
-    scenario = next(
-        (s for s in ROLEPLAY_SCENARIOS if s["id"] == data.scenario_id),
-        None,
-    )
+    if len(data.user_message) > MAX_TEXT_LEN:
+        raise HTTPException(status_code=413, detail="Mensaje demasiado largo.")
 
+    scenario = next(
+        (s for s in ROLEPLAY_SCENARIOS if s["id"] == data.scenario_id), None
+    )
     if not scenario:
-        raise HTTPException(
-            status_code=404,
-            detail="Escenario no encontrado",
-        )
+        raise HTTPException(status_code=404, detail="Escenario no encontrado")
 
     system_prompt = (
         "Eres un tutor de inglés (AI Language Coach) empático y motivador. "
-        "Responde de forma natural, corrigiendo gramática y pronunciación "
-        "sin romper la fluidez de la conversación. Da retroalimentación "
-        "constructiva y anima al estudiante. "
-        f"Escenario: {scenario['title']}. "
-        f"Tu rol: {scenario['role']}."
+        "Responde de forma natural, corrigiendo gramática y pronunciación sin romper la fluidez. "
+        f"Escenario: {scenario['title']}. Tu rol: {scenario['role']}."
     )
 
-    messages = [{"role": "system", "content": system_prompt}]
-
-    # --- FIX: el frontend ya empuja el mensaje del usuario a `conversation_history`
-    # ANTES de llamar al endpoint (ver roleplayHistory.push en app.js), y aquí se
-    # volvía a añadir vía `data.user_message`. Resultado: dos mensajes "user"
-    # seguidos en el payload a OpenAI. Deduplicamos por seguridad, sea cual sea
-    # el estado que mande el cliente.
     history = list(data.conversation_history)
     last = history[-1] if history else None
     if not (
@@ -626,77 +735,38 @@ async def roleplay_respond(data: RoleplayMessageRequest, request: Request):
     ):
         history.append({"role": "user", "content": data.user_message})
 
-    messages.extend(history)  # type: ignore
-
     try:
-        if GEMINI_API_KEY:
-            # Convertir el historial al formato de Gemini
+        model = get_gemini_model(system_prompt)
+        if model:
             gemini_history = []
-            # El system_prompt se coloca como primer mensaje de usuario
-            gemini_history.append({"role": "user", "parts": [system_prompt]})
-
-            # Añadir el historial conversacional (excluyendo el último mensaje de usuario si ya está duplicado)
-            # Nota: history ya contiene los mensajes previos (sin duplicar el último)
-            for msg in history:
-                # Convertir roles: "assistant" -> "model", "user" -> "user"
+            for msg in history[:-1]:
                 role = "model" if msg.get("role") == "assistant" else "user"
                 gemini_history.append({"role": role, "parts": [msg.get("content", "")]})
 
-            # Iniciar sesión de chat con el historial completo
-            model = genai.GenerativeModel("gemini-3.6-flash")  # type: ignore
             chat = model.start_chat(history=gemini_history)
-
-            # Enviar el mensaje del usuario (ya está en history como último, pero lo enviamos de nuevo)
-            # Para evitar duplicados, usamos el mensaje del usuario actual sin añadirlo al historial de la sesión
-            # Si ya lo incluimos en history, podemos usar send_message con el mismo texto.
-            # Pero como history ya contiene el mensaje del usuario (por la deduplicación),
-            # lo mejor es no volver a añadirlo. Sin embargo, start_chat ya tiene el historial,
-            # por lo que enviar el mensaje actual con send_message lo añadirá al historial.
-            # Para evitar duplicados, podemos pasar el mensaje directamente en el último lugar.
-            # Opción: no incluir el último mensaje del usuario en el historial de la sesión,
-            # y enviarlo con send_message.
-            # Simplificamos: enviamos el mensaje del usuario con send_message.
-            # Pero tenemos que asegurarnos de no duplicar: quitamos el último elemento de gemini_history si es el mensaje del usuario.
-            # Como lo hemos incluido en history, podemos no incluirlo en gemini_history y enviarlo aparte.
-            # Para mayor claridad, reconstruimos el historial sin el último mensaje si coincide.
-            # En lugar de complicar, usamos el mensaje directamente.
-            # Para no duplicar, extraemos el mensaje del usuario actual y lo enviamos.
             response = chat.send_message(data.user_message)
             bot_reply = response.text
         else:
-            # Fallback sin API
-            if "coffee" in data.user_message.lower():
-                bot_reply = "Great choice! Would you like that for here or to go?"
-            elif "interview" in data.scenario_id:
-                bot_reply = "Impressive! Could you describe a challenge you overcame?"
-            else:
-                bot_reply = "Thank you. I have found your reservation. Do you prefer a window or aisle seat?"
+            bot_reply = "Thank you. I have received your message!"
     except Exception as e:
-        logger.exception(
-            "Fallo al llamar a Gemini en /api/roleplay/respond (scenario_id=%s)",
-            data.scenario_id,
-        )
-        bot_reply = "I'm sorry, I couldn't process that. Could you please repeat?"
-
-    words = len(data.user_message.split())
-    feedback = (
-        "¡Excelente fluidez!"
-        if words > 5
-        else "Intenta usar oraciones más largas y variadas."
-    )
+        logger.exception(f"Error en Gemini Roleplay: {e}")
+        bot_reply = "I'm sorry, I couldn't process that. Could you repeat?"
 
     return {
         "bot_reply": bot_reply,
-        "feedback": feedback,
+        "feedback": (
+            "¡Excelente fluidez!"
+            if len(data.user_message.split()) > 5
+            else "Intenta usar frases más largas."
+        ),
     }
 
 
 @app.get("/api/placement/start")
 def start_placement_test():
-    initial_level = "A2"
-    q = PLACEMENT_QUESTIONS[initial_level][0]
+    q = PLACEMENT_QUESTIONS["A2"][0]
     return {
-        "level": initial_level,
+        "level": "A2",
         "question": {"id": q["id"], "question": q["question"], "options": q["options"]},
         "step": 1,
         "total_steps": 6,
@@ -705,80 +775,51 @@ def start_placement_test():
 
 @app.post("/api/placement/next")
 def next_placement_question(data: PlacementStepRequest):
+    if data.current_level not in LEVEL_ORDER:
+        raise HTTPException(status_code=400, detail="Nivel inválido.")
+    if data.current_level not in PLACEMENT_QUESTIONS:
+        raise HTTPException(status_code=400, detail="No hay preguntas para ese nivel.")
+
     curr_level = data.current_level
     curr_idx = LEVEL_ORDER.index(curr_level)
+    q_data = next(
+        (
+            item
+            for item in PLACEMENT_QUESTIONS[curr_level]
+            if item["id"] == data.question_id
+        ),
+        None,
+    )
+    if not q_data:
+        raise HTTPException(status_code=400, detail="Pregunta inválida para ese nivel.")
 
-    q_data = None
-    for item in PLACEMENT_QUESTIONS[curr_level]:
-        if item["id"] == data.question_id:
-            q_data = item
-            break
-
-    is_correct = q_data and q_data["correct"] == data.selected_option
-    # --- FIX: antes esta entrada no guardaba 'question_id', así que el
-    # filtro de "preguntas ya respondidas" de más abajo (answered_ids)
-    # comparaba contra una lista de puros None y nunca excluía nada. Efecto
-    # real: si el test rebotaba de vuelta a un nivel ya visitado, siempre se
-    # repetía la primera pregunta de ese nivel. Con question_id guardado,
-    # el filtro funciona de verdad.
+    is_correct = q_data["correct"] == data.selected_option
     updated_history = data.history + [
         {"level": curr_level, "question_id": data.question_id, "correct": is_correct}
     ]
-    step_num = len(updated_history) + 1
-
-    if is_correct:
-        next_idx = min(curr_idx + 1, len(LEVEL_ORDER) - 1)
-    else:
-        next_idx = max(curr_idx - 1, 0)
-
-    next_level = LEVEL_ORDER[next_idx]
 
     if len(updated_history) >= 6:
-        final_level = calculate_final_level(updated_history)
         return {
             "completed": True,
-            "final_level": final_level,
-            "accuracy": round(
-                sum(1 for h in updated_history if h["correct"])
-                / len(updated_history)
-                * 100,
-                1,
-            ),
+            "final_level": calculate_final_level(updated_history),
             "history": updated_history,
         }
+
+    next_idx = (
+        min(curr_idx + 1, len(LEVEL_ORDER) - 1) if is_correct else max(curr_idx - 1, 0)
+    )
+    next_level = LEVEL_ORDER[next_idx]
+    if next_level not in PLACEMENT_QUESTIONS:
+        next_level = curr_level
 
     answered_ids = [h.get("question_id") for h in updated_history]
     available_qs = [
         q for q in PLACEMENT_QUESTIONS[next_level] if q["id"] not in answered_ids
     ]
-
     if not available_qs:
-        # El nivel objetivo (next_level) ya no tiene preguntas sin usar.
-        # Antes de rendirnos y repetir una, probamos con las preguntas sin
-        # usar del nivel actual (curr_level) como alternativa razonable.
-        fallback_qs = [
-            q for q in PLACEMENT_QUESTIONS[curr_level] if q["id"] not in answered_ids
-        ]
-        if fallback_qs:
-            next_level = curr_level
-            available_qs = fallback_qs
-        else:
-            # Últimísimo recurso: de verdad no queda ninguna pregunta sin
-            # usar en ninguno de los dos niveles. Repetimos una, pero
-            # dejamos rastro en el log — con más preguntas por nivel esto
-            # no debería ocurrir nunca en la práctica.
-            logger.warning(
-                "Banco de preguntas de placement agotado en niveles '%s'/'%s' "
-                "tras %d preguntas; se repetirá una pregunta ya vista.",
-                next_level,
-                curr_level,
-                len(updated_history),
-            )
-            next_level = curr_level
-            available_qs = PLACEMENT_QUESTIONS[next_level]
+        available_qs = PLACEMENT_QUESTIONS[next_level]
 
     next_q = available_qs[0]
-
     return {
         "completed": False,
         "level": next_level,
@@ -787,153 +828,149 @@ def next_placement_question(data: PlacementStepRequest):
             "question": next_q["question"],
             "options": next_q["options"],
         },
-        "step": step_num,
+        "step": len(updated_history) + 1,
         "total_steps": 6,
         "history": updated_history,
     }
 
 
-# --- ENDPOINT WRITING CHECK ---
+# --- WRITING CHECK ---
 @app.post("/api/check-writing")
 async def check_writing(data: WritingCheckRequest):
-    """
-    Comprueba gramática y ortografía usando la API HTTP pública
-    de LanguageTool.
-
-    No requiere Java ni language_tool_python.
-    """
-
-    if not data.text.strip():
-        return {
-            "feedback": [],
-            "score": 100,
-        }
-
-    if len(data.text) > 20000:
+    text = data.text.strip()
+    if not text:
+        return {"feedback": [], "score": 100}
+    if len(text) > 2000:
         raise HTTPException(
-            status_code=400,
-            detail="El texto no puede superar los 20.000 caracteres.",
+            status_code=413, detail="Texto demasiado largo (máx. 2000 caracteres)."
         )
-
     try:
         async with httpx.AsyncClient(timeout=20.0) as client:
             response = await client.post(
                 "https://api.languagetool.org/v2/check",
-                data={
-                    "text": data.text,
-                    "language": "en-US",
-                },
+                data={"text": text, "language": "en-US"},
             )
-
         response.raise_for_status()
-
-        result = response.json()
-        matches = result.get("matches", [])
-
-        feedback = []
-
-        for match in matches:
-            message = match.get("message", "")
-            short_message = match.get("shortMessage", "")
-
-            replacements = [
-                replacement.get("value", "")
-                for replacement in match.get("replacements", [])[:3]
-                if replacement.get("value")
-            ]
-
-            feedback.append(
-                {
-                    "message": message,
-                    "short_message": (
-                        short_message
-                        or (message[:50] + "..." if len(message) > 50 else message)
-                    ),
-                    "replacements": replacements,
-                }
-            )
-
-        score = max(0, 100 - len(matches) * 5)
-
-        return {
-            "feedback": feedback,
-            "score": score,
-        }
-
-    except httpx.TimeoutException:
-        logger.warning("Timeout consultando LanguageTool.")
-
-        raise HTTPException(
-            status_code=504,
-            detail="LanguageTool tardó demasiado en responder.",
-        )
-
-    except httpx.HTTPStatusError as e:
-        logger.error(
-            "LanguageTool respondió con HTTP %s.",
-            e.response.status_code,
-        )
-
-        raise HTTPException(
-            status_code=503,
-            detail="El servicio de corrección gramatical no está disponible.",
-        )
-
+        matches = response.json().get("matches", [])
+        feedback = [
+            {
+                "message": m.get("message", ""),
+                "replacements": [
+                    r.get("value")
+                    for r in m.get("replacements", [])[:3]
+                    if r.get("value")
+                ],
+            }
+            for m in matches
+        ]
+        return {"feedback": feedback, "score": max(0, 100 - len(matches) * 5)}
+    except HTTPException:
+        raise
     except Exception:
-        logger.exception("Error inesperado consultando LanguageTool.")
-
         raise HTTPException(
-            status_code=503,
-            detail="No se pudo realizar la corrección gramatical.",
+            status_code=503, detail="No se pudo realizar la corrección gramatical."
         )
 
 
-# --- ENDPOINTS DE GAMIFICACIÓN Y DESAFÍOS ---
+# --- GAMIFICACIÓN Y DESAFÍOS (SUPABASE) — requieren usuario autenticado ---
 @app.get("/api/user/stats")
-def user_stats(user_id: str = "default"):
+def user_stats(user_id: str = Depends(get_current_user)):
     return get_user_stats(user_id)
 
 
-@app.get("/api/user/update-xp")
-def user_update_xp(user_id: str = "default", xp_gain: int = 10):
+@app.post("/api/user/update-xp")
+def user_update_xp(xp_gain: int = 10, user_id: str = Depends(get_current_user)):
+    if xp_gain <= 0 or xp_gain > 1000:
+        raise HTTPException(status_code=400, detail="Cantidad de XP inválida.")
     return update_user_xp(user_id, xp_gain)
 
 
 @app.get("/api/daily-challenge")
 def get_daily_challenge():
-    today = date.today()
-    conn = sqlite3.connect(DB_NAME)
-    c = conn.cursor()
-    c.execute("SELECT challenge_data FROM daily_challenges WHERE date = ?", (today,))
-    row = c.fetchone()
-    if not row:
-        missions = [
-            {"id": 1, "text": "Repasa 5 tarjetas SRS", "type": "srs", "target": 5},
-            {
-                "id": 2,
-                "text": "Práctica 2 minutos de Shadowing",
-                "type": "shadowing",
-                "target": 2,
-            },
-            {"id": 3, "text": "Completa un Roleplay", "type": "roleplay", "target": 1},
-        ]
-        challenge_data = json.dumps(missions)
-        c.execute(
-            "INSERT INTO daily_challenges (date, challenge_data) VALUES (?, ?)",
-            (today, challenge_data),
+    if not supabase:
+        return {"date": str(date.today()), "missions": []}
+    today_str = date.today().isoformat()
+    try:
+        res = (
+            supabase.table("daily_challenges")
+            .select("challenge_data")
+            .eq("date", today_str)
+            .execute()
         )
-        conn.commit()
-    else:
-        challenge_data = row[0]
-    conn.close()
-    return {"date": today.isoformat(), "missions": json.loads(challenge_data)}
+
+        challenge_data: Any
+        if not res.data:
+            missions = [
+                {"id": 1, "text": "Repasa 5 tarjetas SRS", "type": "srs", "target": 5},
+                {
+                    "id": 2,
+                    "text": "Práctica 2 minutos de Shadowing",
+                    "type": "shadowing",
+                    "target": 2,
+                },
+                {
+                    "id": 3,
+                    "text": "Completa un Roleplay",
+                    "type": "roleplay",
+                    "target": 1,
+                },
+            ]
+            supabase.table("daily_challenges").insert(
+                {"date": today_str, "challenge_data": missions}
+            ).execute()
+            challenge_data = missions
+        else:
+            first_row = cast(Dict[str, Any], res.data[0])
+            challenge_data = first_row["challenge_data"]
+            if isinstance(challenge_data, str):
+                challenge_data = json.loads(challenge_data)
+    except Exception as e:
+        logger.error(f"Error Supabase (daily-challenge): {e}")
+        raise HTTPException(
+            status_code=503, detail="Servicio de base de datos no disponible."
+        )
+
+    return {"date": today_str, "missions": challenge_data}
 
 
 @app.post("/api/daily-challenge/complete")
 def complete_challenge(
-    mission_id: int = Query(..., description="ID de la misión"),
-    user_id: str = Query("default", description="ID del usuario"),
+    mission_id: int = Query(...), user_id: str = Depends(get_current_user)
 ):
+    """
+    Requiere la tabla `completed_missions` con constraint único
+    (user_id, date, mission_id) para impedir reclamar la misma misión
+    más de una vez por día (ver migración SQL).
+    """
+    if not supabase:
+        raise HTTPException(status_code=500, detail="Supabase no inicializado.")
+
+    today_str = date.today().isoformat()
+    try:
+        existing = (
+            supabase.table("completed_missions")
+            .select("mission_id")
+            .eq("user_id", user_id)
+            .eq("date", today_str)
+            .eq("mission_id", mission_id)
+            .execute()
+        )
+        if existing.data:
+            raise HTTPException(
+                status_code=400, detail="Esta misión ya fue completada hoy."
+            )
+
+        supabase.table("completed_missions").insert(
+            {"user_id": user_id, "date": today_str, "mission_id": mission_id}
+        ).execute()
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error Supabase (complete_challenge): {e}")
+        raise HTTPException(
+            status_code=503, detail="No se pudo registrar la misión completada."
+        )
+
     xp_reward = 15
     stats = update_user_xp(user_id, xp_reward)
     return {
@@ -944,81 +981,82 @@ def complete_challenge(
 
 
 @app.get("/api/user/progress")
-def get_user_progress(user_id: str = "default", days: int = 30):
-    conn = sqlite3.connect(DB_NAME)
-    c = conn.cursor()
-    start_date = date.today() - timedelta(days=days)
-    c.execute(
-        """
-        SELECT date, xp_gained, words_passed, roleplays_completed
-        FROM daily_progress
-        WHERE user_id = ? AND date >= ?
-        ORDER BY date
-    """,
-        (user_id, start_date),
-    )
-    rows = c.fetchall()
-    conn.close()
+def get_user_progress(days: int = 30, user_id: str = Depends(get_current_user)):
+    if not supabase:
+        return {"dates": [], "xp": [], "words": [], "roleplays": []}
+    days = max(1, min(days, 365))
+    start_date_str = (date.today() - timedelta(days=days)).isoformat()
+    try:
+        res = (
+            supabase.table("daily_progress")
+            .select("date, xp_gained, words_passed, roleplays_completed")
+            .eq("user_id", user_id)
+            .gte("date", start_date_str)
+            .order("date")
+            .execute()
+        )
+    except Exception as e:
+        logger.error(f"Error Supabase (user progress): {e}")
+        raise HTTPException(
+            status_code=503, detail="Servicio de base de datos no disponible."
+        )
+
+    rows = cast(List[Dict[str, Any]], res.data)
     return {
-        "dates": [r[0] for r in rows],
-        "xp": [r[1] for r in rows],
-        "words": [r[2] for r in rows],
-        "roleplays": [r[3] for r in rows],
+        "dates": [r["date"] for r in rows],
+        "xp": [r["xp_gained"] for r in rows],
+        "words": [r["words_passed"] for r in rows],
+        "roleplays": [r["roleplays_completed"] for r in rows],
     }
 
 
 @app.post("/api/evaluate-reading")
 async def evaluate_reading(
-    target_text: str = Form(...), audio_file: UploadFile = File(...)
+    target_text: str = Form(..., max_length=MAX_TEXT_LEN),
+    audio_file: UploadFile = File(...),
+    user_id: str = Depends(get_current_user),
 ):
-    """
-    Transcribe el audio leído por el estudiante usando AssemblyAI.
-    """
     if not ASSEMBLYAI_API_KEY:
+        raise HTTPException(status_code=503, detail="Requiere ASSEMBLYAI_API_KEY.")
+
+    MAX_AUDIO_SIZE = 10 * 1024 * 1024  # 10 MB
+    ALLOWED_AUDIO_TYPES = {
+        "audio/wav",
+        "audio/mpeg",
+        "audio/mp4",
+        "audio/webm",
+        "audio/x-wav",
+    }
+
+    if audio_file.content_type not in ALLOWED_AUDIO_TYPES:
         raise HTTPException(
-            status_code=503,
-            detail="La evaluación de lectura requiere configurar ASSEMBLYAI_API_KEY en las variables de entorno.",
+            status_code=415,
+            detail=f"Formato de audio no soportado: {audio_file.content_type}",
         )
 
-    # Guardar el audio temporalmente
     suffix = Path(audio_file.filename or "audio.wav").suffix or ".wav"
     tmp_path = None
     try:
+        content = await audio_file.read()
+        if len(content) > MAX_AUDIO_SIZE:
+            raise HTTPException(
+                status_code=413, detail="El archivo de audio supera el límite de 10 MB."
+            )
+
         with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
-            content = await audio_file.read()
             tmp.write(content)
             tmp_path = tmp.name
 
-        # Transcribir con AssemblyAI
         transcriber = aai.Transcriber()
         transcript = transcriber.transcribe(tmp_path)
-        transcript_error = getattr(transcript, "error", None)
-
-        if transcript_error:
-            logger.error(f"Error en AssemblyAI: {transcript_error}")
-            raise HTTPException(
-                status_code=500,
-                detail=f"Error al transcribir el audio: {transcript_error}",
-            )
-
         spoken_text = (getattr(transcript, "text", "") or "").strip()
-
-    except Exception as e:
-        logger.exception("Error al transcribir audio con AssemblyAI")
-        raise HTTPException(500, f"Error al procesar el audio: {str(e)}")
     finally:
-        if tmp_path:
-            try:
-                os.unlink(tmp_path)
-            except (NameError, FileNotFoundError, OSError):
-                pass
+        if tmp_path and os.path.exists(tmp_path):
+            os.unlink(tmp_path)
 
     if not spoken_text:
-        raise HTTPException(
-            400, detail="No se pudo reconocer ninguna palabra en el audio."
-        )
+        raise HTTPException(400, detail="No se pudo reconocer audio.")
 
-    # El resto del código (evaluación de pronunciación, IPA, SRS) permanece IGUAL
     target_ipa = ipa.convert(target_text)
     spoken_ipa = ipa.convert(spoken_text)
     score = round(
@@ -1026,8 +1064,8 @@ async def evaluate_reading(
     )
 
     target_words = target_text.split()
-    word_analysis = []
     failed_words = []
+    word_analysis = []
     for tw in target_words:
         if tw.lower() in spoken_text.lower():
             word_analysis.append(
@@ -1039,25 +1077,47 @@ async def evaluate_reading(
             )
             failed_words.append(tw)
 
-    if failed_words:
-        conn = sqlite3.connect(DB_NAME)
-        c = conn.cursor()
-        today = date.today()
-        for fw in failed_words:
-            fipa = f"/{ipa.convert(fw)}/"
-            c.execute(
-                """
-                INSERT INTO srs_words (word, ipa, level, next_review, times_failed)
-                VALUES (?, ?, 1, ?, 1)
-                ON CONFLICT(word) DO UPDATE SET level=1, next_review=?, times_failed=times_failed+1
-            """,
-                (fw, fipa, today, today),
-            )
-        conn.commit()
-        conn.close()
+    if failed_words and supabase:
+        today_str = date.today().isoformat()
+        try:
+            for fw in failed_words:
+                clean_fw = fw.strip().lower()
+                existing = (
+                    supabase.table("srs_words")
+                    .select("times_failed")
+                    .eq("word", clean_fw)
+                    .execute()
+                )
+                if existing.data:
+                    existing_word = existing.data[0]
+                    previous_failures = (
+                        existing_word.get("times_failed", 0)
+                        if isinstance(existing_word, dict)
+                        else 0
+                    )
+                    tf = (
+                        previous_failures + 1
+                        if isinstance(previous_failures, int)
+                        and not isinstance(previous_failures, bool)
+                        else 1
+                    )
+                    supabase.table("srs_words").update(
+                        {"level": 1, "next_review": today_str, "times_failed": tf}
+                    ).eq("word", clean_fw).execute()
+                else:
+                    supabase.table("srs_words").insert(
+                        {
+                            "word": clean_fw,
+                            "ipa": f"/{ipa.convert(clean_fw)}/",
+                            "level": 1,
+                            "next_review": today_str,
+                            "times_failed": 1,
+                        }
+                    ).execute()
+        except Exception as e:
+            logger.error(f"Error Supabase (evaluate-reading srs update): {e}")
 
-    words_passed = len(target_words) - len(failed_words)
-    update_daily_progress(user_id="default", words=words_passed)
+    update_daily_progress(user_id=user_id, words=len(target_words) - len(failed_words))
 
     return {
         "accuracy_score": score,
