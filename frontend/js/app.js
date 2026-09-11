@@ -1010,7 +1010,7 @@ async function fetchSRSDueWords() {
 
 async function conectarConServidorRender(endpoint, showLoading = false) {
     if (!authToken) {
-        console.error("No se encontró token de autenticación.");
+        console.error("No se encontró token de autenticación, inicie sesión de nuevo.");
         showLoginModal();
         return { ok: false, status: 401 };
     }
