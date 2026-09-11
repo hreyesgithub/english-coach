@@ -1007,7 +1007,7 @@ def get_daily_challenge():
 @app.post("/api/daily-challenge/complete")
 def complete_challenge(
     mission_id: int = Query(...), user_id: str = Depends(get_current_user)
-):
+    ):
     """
     Requiere la tabla `completed_missions` con constraint único
     (user_id, date, mission_id) para impedir reclamar la misma misión

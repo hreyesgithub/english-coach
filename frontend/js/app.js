@@ -145,27 +145,50 @@ function clearSessionStorage() {
     localStorage.removeItem("current_username");
 }
 
-// --- MODO OSCURO ---
+// --- MODO OSCURO (CORREGIDO) ---
 function initDarkMode() {
     const toggle = document.getElementById("dark-mode-toggle");
-    const isDark = localStorage.getItem("dark-mode") === "true";
+    
+    // Si no hay preferencia guardada, respeta la del sistema operativo
+    const savedTheme = localStorage.getItem("dark-mode");
+    const systemPrefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
+    const isDark = savedTheme !== null ? savedTheme === "true" : systemPrefersDark;
 
-    if (isDark) {
-        document.documentElement.classList.add("dark");
-        if (toggle)
-            toggle.innerHTML = '<i class="fa-solid fa-sun text-amber-400"></i>';
-    }
+    // Aplicar estado inicial al HTML
+    const applyTheme = (dark) => {
+        if (dark) {
+            document.documentElement.classList.add("dark");
+        } else {
+            document.documentElement.classList.remove("dark");
+        }
 
-    if (toggle) {
-        toggle.addEventListener("click", () => {
-            document.documentElement.classList.toggle("dark");
-            const activeDark =
-                document.documentElement.classList.contains("dark");
-            localStorage.setItem("dark-mode", activeDark);
-            toggle.innerHTML = activeDark
+        if (toggle) {
+            toggle.innerHTML = dark
                 ? '<i class="fa-solid fa-sun text-amber-400"></i>'
                 : '<i class="fa-solid fa-moon"></i>';
-            if (progressChart) fetchProgressData();
+        }
+    };
+
+    // Aplicar al cargar
+    applyTheme(isDark);
+
+    // Event Listener para alternar tema
+    if (toggle) {
+        // Remover listeners previos para evitar duplicados
+        toggle.replaceWith(toggle.cloneNode(true));
+        const newToggle = document.getElementById("dark-mode-toggle");
+
+        newToggle.addEventListener("click", () => {
+            const currentlyDark = document.documentElement.classList.contains("dark");
+            const newDarkState = !currentlyDark;
+
+            localStorage.setItem("dark-mode", newDarkState);
+            applyTheme(newDarkState);
+
+            // Re-renderizar gráfico si existe
+            if (typeof progressChart !== "undefined" && progressChart) {
+                fetchProgressData();
+            }
         });
     }
 }
@@ -375,49 +398,44 @@ async function completeMission(missionId, btnElement) {
     if (processing.mission) return;
     processing.mission = true;
 
-    showLoadingAlert("Completando misión", "Guardando tus puntos...");
-
     if (btnElement) {
         btnElement.disabled = true;
-        btnElement.classList.add("opacity-50", "cursor-not-allowed");
         btnElement.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i>';
     }
 
     try {
-        const res = await fetch(
-            `${API_BASE_URL}/api/daily-challenge/complete?mission_id=${missionId}`,
-            { headers: {
-                    Authorization: `Bearer ${authToken}`, // Enviando token al backend
-                },
-                method: "POST" },
+        // POST con mission_id como query param en la URL
+        const res = await conectarConServidorRender(
+            `/api/daily-challenge/complete?mission_id=${missionId}`,
+            "POST"
         );
+
         if (res.ok) {
             const data = await res.json();
             await Swal.fire({
                 icon: "success",
                 title: "¡Misión completada!",
-                text: `+${data.xp_gained} XP`,
+                text: `+${data.xp_gained || 15} XP`,
                 timer: 2000,
                 showConfirmButton: false,
             });
             await fetchUserStats();
         } else {
-            throw new Error("Error al completar misión");
+            const errorData = await res.json().catch(() => ({}));
+            throw new Error(errorData.detail || `Error ${res.status}`);
         }
     } catch (e) {
         console.error("Error al completar misión:", e);
-        hideLoadingAlert();
         Swal.fire({
             icon: "error",
             title: "Error",
-            text: "No se pudo completar la misión. Intenta de nuevo.",
+            text: e.message || "No se pudo registrar la misión.",
             confirmButtonColor: "#4f46e5",
         });
     } finally {
         processing.mission = false;
         if (btnElement) {
             btnElement.disabled = false;
-            btnElement.classList.remove("opacity-50", "cursor-not-allowed");
             btnElement.innerHTML = "Completar";
         }
     }
@@ -1007,8 +1025,12 @@ async function fetchSRSDueWords() {
 }
 
 //localStorage.clear();
-
-async function conectarConServidorRender(endpoint, showLoading = false) {
+/*
+* Petición GET normal (sin cambios): const res = await conectarConServidorRender("/api/daily-challenge");
+* Petición POST con Query Param (como el de tus misiones): const res = await conectarConServidorRender(`/api/daily-challenge/complete?mission_id=${missionId}`, "POST");
+* Petición POST con cuerpo JSON: const res = await conectarConServidorRender("/api/user/update-xp", "POST", { xp: 15 });
+*/
+async function conectarConServidorRender(endpoint, method = "GET", body = null, showLoading = false) {
     if (!authToken) {
         console.error("No se encontró token de autenticación, inicie sesión de nuevo.");
         showLoginModal();
@@ -1020,10 +1042,25 @@ async function conectarConServidorRender(endpoint, showLoading = false) {
     }
 
     try {
-        const response = await fetch(`${API_BASE_URL}${endpoint}`, {
-            method: "GET",
-            headers: { Authorization: `Bearer ${authToken}` },
-        });
+        const headers = {
+            "Authorization": `Bearer ${authToken}`
+        };
+
+        // Si se envía un cuerpo, añadimos el tipo de contenido
+        if (body && method !== "GET") {
+            headers["Content-Type"] = "application/json";
+        }
+
+        const config = {
+            method: method,
+            headers: headers
+        };
+
+        if (body && method !== "GET") {
+            config.body = JSON.stringify(body);
+        }
+
+        const response = await fetch(`${API_BASE_URL}${endpoint}`, config);
 
         if (response.status === 401) {
             console.error("Sesión expirada o no autorizada (401).");
