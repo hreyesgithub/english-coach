@@ -11,6 +11,13 @@ jobs:
     steps:
       - name: Ping Supabase REST API y validar estado
         run: |
+          # Validate secrets are set
+          if [ -z "${{ secrets.SUPABASE_URL }}" ] || [ -z "${{ secrets.SUPABASE_ANON_KEY }}" ]; then
+            echo "Error: SUPABASE_URL or SUPABASE_ANON_KEY secrets are not configured"
+            exit 1
+          fi
+
+          # Make the request with verbose output
           HTTP_STATUS=$(curl -s -o /dev/null -w "%{http_code}" -X GET "${{ secrets.SUPABASE_URL }}/rest/v1/" \
             -H "apikey: ${{ secrets.SUPABASE_ANON_KEY }}" \
             -H "Authorization: Bearer ${{ secrets.SUPABASE_ANON_KEY }}")
@@ -21,3 +28,5 @@ jobs:
             echo "Error: Supabase respondió con un estado inválido ($HTTP_STATUS)"
             exit 1
           fi
+
+          echo "✓ Supabase is alive and responding correctly"

@@ -577,11 +577,11 @@ def get_ipa_transcription(
 
 @app.get("/api/tts-natural")
 async def text_to_speech_natural(
-    text: str = Query(..., max_length=MAX_TEXT_LEN),
-    voice: str = Query("en-US-AvaMultilingualNeural"), # antes: en-US-AriaNeural
-    rate: str = Query("-8%"),   # ligeramente más lento = menos "metralleta"
-    pitch: str = Query("+0Hz"),
-):
+        text: str = Query(..., max_length=MAX_TEXT_LEN),
+        voice: str = Query("en-US-AvaMultilingualNeural"), # antes: en-US-AriaNeural
+        rate: str = Query("-8%"),   # ligeramente más lento = menos "metralleta"
+        pitch: str = Query("+0Hz"),
+    ):
     try:
         clean_text = text.replace("'", "").replace("’", "")
         communicate = edge_tts.Communicate(clean_text, voice, rate=rate, pitch=pitch)
