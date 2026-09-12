@@ -20,7 +20,6 @@
         <!-- Tailwind -->
         <link rel="stylesheet" href="./css/output.css" />
         <!-- Custom CSS -->
-        <!--link rel="stylesheet" href="css/app.css" /-->
         <link rel="stylesheet" href="./css/app_1.css" />
     </head>
     <body
@@ -87,37 +86,38 @@
         </div>
 
         <!-- Header / Navbar con menú hamburguesa -->
-        <header class="bg-indigo-600 dark:bg-indigo-900 text-white shadow-md">
-            <div
-                class="max-w-6xl mx-auto px-4 py-4 flex justify-between items-center">
+        <header class="bg-indigo-600 dark:bg-indigo-900 dark:text-white shadow-md relative z-50">
+            <div class="max-w-6xl mx-auto px-3 sm:px-4 py-3 flex justify-between items-center gap-2">
+                
                 <!-- Botón menú + título -->
-                <div class="flex items-center gap-3">
+                <div class="flex items-center gap-2 sm:gap-3 shrink-0">
                     <button
                         id="menu-toggle"
-                        class="text-white text-3xl focus:outline-none hover:text-indigo-200 transition"
+                        class="text-white text-2xl sm:text-3xl focus:outline-none hover:text-indigo-200 transition p-1"
                         aria-label="Abrir menú">
-                        <i class="material-icons text-3xl">menu</i>
+                        <i class="material-icons text-2xl sm:text-3xl block">menu</i>
                     </button>
-                    <h1
-                        class="text-2xl font-black flex items-center gap-2 tracking-tight">
-                        <i
-                            class="fa-solid fa-graduation-cap text-indigo-200"></i>
-                        LinguaBoost
+                    <h1 class="text-lg sm:text-2xl font-black flex items-center gap-1.5 sm:gap-2 tracking-tight">
+                        <i class="fa-solid fa-graduation-cap text-indigo-200 text-base sm:text-xl"></i>
+                        <span>LinguaBoost</span>
                     </h1>
                 </div>
-                <!-- Badge de nivel y modo oscuro -->
-                <!-- Perfil del Usuario y Controles (Versión Compacta) -->
-                <div class="flex items-center gap-2 sm:gap-3">
+
+                <!-- Perfil del Usuario y Controles -->
+                <div class="flex items-center gap-1.5 sm:gap-3 shrink-0">
+                    
                     <!-- Componente de Usuario Logueado -->
                     <div
                         id="user-profile-badge"
-                        class="flex items-center gap-2 bg-indigo-700/50 dark:bg-indigo-950/70 px-2.5 py-1 rounded-full border border-indigo-400/30 shadow-inner">
+                        class="flex items-center gap-2 bg-indigo-700/50 dark:bg-indigo-950/70 px-2 sm:px-2.5 py-1 rounded-full border border-indigo-400/30 shadow-inner">
                         <img
                             id="nav-user-avatar"
                             src="https://ui-avatars.com/api/?name=User&background=4f46e5&color=fff&bold=true"
                             alt="Avatar"
                             class="w-6 h-6 rounded-full object-cover border border-white/50 shrink-0" />
-                        <div class="flex flex-col text-left justify-center">
+                        
+                        <!-- Oculto en móviles (<640px) para evitar la superposición, visible en escritorio -->
+                        <div class="hidden sm:flex flex-col text-left justify-center">
                             <span
                                 id="nav-username"
                                 class="text-[11px] font-bold text-white tracking-tight truncate max-w-[80px] sm:max-w-[120px] leading-tight">
@@ -134,7 +134,7 @@
                     <!-- Toggle Modo Oscuro -->
                     <button
                         id="dark-mode-toggle"
-                        class="text-white text-lg hover:text-indigo-200 transition p-1.5 rounded-lg focus:outline-none"
+                        class="text-white text-base sm:text-lg hover:text-indigo-200 transition p-1.5 rounded-lg focus:outline-none"
                         aria-label="Cambiar Modo Oscuro">
                         <i class="fa-solid fa-moon"></i>
                     </button>
@@ -143,8 +143,9 @@
                     <button
                         id="logout-btn"
                         onclick="handleLogout()"
-                        class="text-white text-lg hover:text-rose-300 transition p-1.5 rounded-lg focus:outline-none"
-                        title="Cerrar Sesión">
+                        class="text-white text-base sm:text-lg hover:text-rose-300 transition p-1.5 rounded-lg focus:outline-none"
+                        title="Cerrar Sesión"
+                        aria-label="Cerrar Sesión">
                         <i class="fa-solid fa-right-from-bracket"></i>
                     </button>
                 </div>
@@ -153,118 +154,84 @@
             <!-- Menú desplegable -->
             <div
                 id="main-menu"
-                class="hidden absolute left-0 right-0 mt-2 bg-white dark:bg-slate-800 shadow-xl rounded-b-2xl border border-slate-200 dark:border-slate-700 z-50 max-w-6xl mx-auto overflow-hidden">
-                <div class="py-2">
-                    <div
-                        class="px-4 py-1 text-xs uppercase text-slate-500 dark:text-slate-400 font-bold">
+                class="hidden absolute left-2 right-2 sm:left-4 sm:right-4 top-full mt-1 bg-white dark:bg-slate-800 shadow-xl rounded-b-2xl border border-slate-200 dark:border-slate-700 z-50 max-w-6xl mx-auto overflow-hidden">
+                <div class="py-2 max-h-[80vh] overflow-y-auto">
+                    <div class="px-4 py-1 text-xs uppercase text-slate-500 dark:text-slate-400 font-bold">
                         Habilidades
                     </div>
                     <a
                         href="#"
                         data-tab="reading"
                         class="flex items-center px-4 py-2.5 hover:bg-indigo-50 dark:hover:bg-indigo-950/50 text-slate-800 dark:text-slate-100 transition">
-                        <i
-                            class="material-icons mr-3 text-indigo-600 dark:text-indigo-400">
-                            menu_book
-                        </i>
+                        <i class="material-icons mr-3 text-indigo-600 dark:text-indigo-400">menu_book</i>
                         Reading & Speaking
                     </a>
                     <a
                         href="#"
                         data-tab="listening"
                         class="flex items-center px-4 py-2.5 hover:bg-indigo-50 dark:hover:bg-indigo-950/50 text-slate-800 dark:text-slate-100 transition">
-                        <i
-                            class="material-icons mr-3 text-indigo-600 dark:text-indigo-400">
-                            headphones
-                        </i>
+                        <i class="material-icons mr-3 text-indigo-600 dark:text-indigo-400">headphones</i>
                         Listening
                     </a>
                     <a
                         href="#"
                         data-tab="writing"
                         class="flex items-center px-4 py-2.5 hover:bg-indigo-50 dark:hover:bg-indigo-950/50 text-slate-800 dark:text-slate-100 transition">
-                        <i
-                            class="material-icons mr-3 text-indigo-600 dark:text-indigo-400">
-                            edit
-                        </i>
+                        <i class="material-icons mr-3 text-indigo-600 dark:text-indigo-400">edit</i>
                         Writing
                     </a>
                     <a
                         href="#"
                         data-tab="shadowing"
                         class="flex items-center px-4 py-2.5 hover:bg-indigo-50 dark:hover:bg-indigo-950/50 text-slate-800 dark:text-slate-100 transition">
-                        <i
-                            class="material-icons mr-3 text-indigo-600 dark:text-indigo-400">
-                            repeat
-                        </i>
+                        <i class="material-icons mr-3 text-indigo-600 dark:text-indigo-400">repeat</i>
                         Shadowing
                     </a>
-                    <div
-                        class="border-t border-slate-200 dark:border-slate-700 my-2"></div>
-                    <div
-                        class="px-4 py-1 text-xs uppercase text-slate-500 dark:text-slate-400 font-bold">
+                    <div class="border-t border-slate-200 dark:border-slate-700 my-2"></div>
+                    <div class="px-4 py-1 text-xs uppercase text-slate-500 dark:text-slate-400 font-bold">
                         Vocabulario
                     </div>
                     <a
                         href="#"
                         data-tab="srs"
                         class="flex items-center px-4 py-2.5 hover:bg-indigo-50 dark:hover:bg-indigo-950/50 text-slate-800 dark:text-slate-100 transition">
-                        <i
-                            class="material-icons mr-3 text-indigo-600 dark:text-indigo-400">
-                            layers
-                        </i>
+                        <i class="material-icons mr-3 text-indigo-600 dark:text-indigo-400">layers</i>
                         Banco SRS
                     </a>
                     <a
                         href="#"
                         data-tab="ipa-matrix"
                         class="flex items-center px-4 py-2.5 hover:bg-indigo-50 dark:hover:bg-indigo-950/50 text-slate-800 dark:text-slate-100 transition">
-                        <i
-                            class="material-icons mr-3 text-indigo-600 dark:text-indigo-400">
-                            translate
-                        </i>
+                        <i class="material-icons mr-3 text-indigo-600 dark:text-indigo-400">translate</i>
                         Tabla Fonética
                     </a>
-                    <div
-                        class="border-t border-slate-200 dark:border-slate-700 my-2"></div>
-                    <div
-                        class="px-4 py-1 text-xs uppercase text-slate-500 dark:text-slate-400 font-bold">
+                    <div class="border-t border-slate-200 dark:border-slate-700 my-2"></div>
+                    <div class="px-4 py-1 text-xs uppercase text-slate-500 dark:text-slate-400 font-bold">
                         Conversación
                     </div>
                     <a
                         href="#"
                         data-tab="roleplay"
                         class="flex items-center px-4 py-2.5 hover:bg-indigo-50 dark:hover:bg-indigo-950/50 text-slate-800 dark:text-slate-100 transition">
-                        <i
-                            class="material-icons mr-3 text-indigo-600 dark:text-indigo-400">
-                            chat
-                        </i>
+                        <i class="material-icons mr-3 text-indigo-600 dark:text-indigo-400">chat</i>
                         Roleplay por Voz
                     </a>
-                    <div
-                        class="border-t border-slate-200 dark:border-slate-700 my-2"></div>
-                    <div
-                        class="px-4 py-1 text-xs uppercase text-slate-500 dark:text-slate-400 font-bold">
+                    <div class="border-t border-slate-200 dark:border-slate-700 my-2"></div>
+                    <div class="px-4 py-1 text-xs uppercase text-slate-500 dark:text-slate-400 font-bold">
                         Evaluación
                     </div>
                     <a
                         href="#"
                         data-tab="placement"
                         class="flex items-center px-4 py-2.5 hover:bg-indigo-50 dark:hover:bg-indigo-950/50 text-slate-800 dark:text-slate-100 transition">
-                        <i
-                            class="material-icons mr-3 text-indigo-600 dark:text-indigo-400">
-                            science
-                        </i>
+                        <i class="material-icons mr-3 text-indigo-600 dark:text-indigo-400">science</i>
                         Test de Nivel
                     </a>
                     <a
                         href="#"
                         data-tab="challenge"
                         class="flex items-center px-4 py-2.5 hover:bg-indigo-50 dark:hover:bg-indigo-950/50 text-slate-800 dark:text-slate-100 transition">
-                        <i
-                            class="material-icons mr-3 text-indigo-600 dark:text-indigo-400">
-                            emoji_events
-                        </i>
+                        <i class="material-icons mr-3 text-indigo-600 dark:text-indigo-400">emoji_events</i>
                         Desafío Diario
                     </a>
                 </div>

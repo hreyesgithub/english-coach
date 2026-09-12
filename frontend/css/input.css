@@ -1,1 +1,4 @@
 @import "tailwindcss";
+
+/* Define que las clases dark: respondan a la clase .dark en <html> */
+@custom-variant dark (&:where(.dark, .dark *));

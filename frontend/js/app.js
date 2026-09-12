@@ -7,8 +7,12 @@
 // Para pruebas en Render
 const API_BASE_URL = "https://english-coach-ekm0.onrender.com";
 const SUPABASE_URL = "https://fybnnkzufbobktzuovba.supabase.co";
-const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZ5Ym5ua3p1ZmJvYmt0enVvdmJhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODkxMDUwNjIsImV4cCI6MjEwNDY4MTA2Mn0.efz0qnh-r6XwfgiO4pdx6tBwXU4_DLUOlkGDWa3rbPM";
-const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+const SUPABASE_ANON_KEY =
+    "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZ5Ym5ua3p1ZmJvYmt0enVvdmJhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODkxMDUwNjIsImV4cCI6MjEwNDY4MTA2Mn0.efz0qnh-r6XwfgiO4pdx6tBwXU4_DLUOlkGDWa3rbPM";
+const supabaseClient = window.supabase.createClient(
+    SUPABASE_URL,
+    SUPABASE_ANON_KEY,
+);
 
 // Estado global
 let curriculumData = {};
@@ -111,7 +115,10 @@ document.addEventListener("DOMContentLoaded", async () => {
 async function checkAutoLogin() {
     try {
         // Supabase verifica el storage y refresca automáticamente el token si venció
-        const { data: { session }, error } = await supabaseClient.auth.getSession();
+        const {
+            data: { session },
+            error,
+        } = await supabaseClient.auth.getSession();
 
         if (session && session.access_token && !error) {
             // Sesión válida o refrescada exitosamente
@@ -121,7 +128,10 @@ async function checkAutoLogin() {
             localStorage.setItem("current_username", currentUsername);
 
             if (!localStorage.getItem("username")) {
-                localStorage.setItem("username", session.user.email.split("@")[0]);
+                localStorage.setItem(
+                    "username",
+                    session.user.email.split("@")[0],
+                );
             }
 
             hideLoginModal();
@@ -147,50 +157,56 @@ function clearSessionStorage() {
 
 // --- MODO OSCURO (CORREGIDO) ---
 function initDarkMode() {
-    const toggle = document.getElementById("dark-mode-toggle");
-    
-    // Si no hay preferencia guardada, respeta la del sistema operativo
+    // 1. Determinar el tema según preferencia guardada o del sistema operativo
     const savedTheme = localStorage.getItem("dark-mode");
-    const systemPrefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
-    const isDark = savedTheme !== null ? savedTheme === "true" : systemPrefersDark;
+    const systemPrefersDark = window.matchMedia(
+        "(prefers-color-scheme: dark)",
+    ).matches;
+    const isDark =
+        savedTheme !== null ? savedTheme === "true" : systemPrefersDark;
 
-    // Aplicar estado inicial al HTML
-    const applyTheme = (dark) => {
+    // 2. Función global para aplicar el tema en la etiqueta <html> e Iconos
+    window.applyTheme = function (dark) {
         if (dark) {
             document.documentElement.classList.add("dark");
         } else {
             document.documentElement.classList.remove("dark");
         }
 
-        if (toggle) {
-            toggle.innerHTML = dark
+        // Actualizar todos los botones/iconos de modo oscuro presentes en el DOM
+        const toggleButtons = document.querySelectorAll(
+            "#dark-mode-toggle, .dark-mode-toggle",
+        );
+        toggleButtons.forEach((btn) => {
+            btn.innerHTML = dark
                 ? '<i class="fa-solid fa-sun text-amber-400"></i>'
                 : '<i class="fa-solid fa-moon"></i>';
+        });
+
+        // Guardar preferencia
+        localStorage.setItem("dark-mode", dark);
+
+        // Re-renderizar gráfico de progreso si existe
+        if (typeof progressChart !== "undefined" && progressChart) {
+            fetchProgressData();
         }
     };
 
-    // Aplicar al cargar
-    applyTheme(isDark);
+    // 3. Aplicar estado inicial
+    window.applyTheme(isDark);
 
-    // Event Listener para alternar tema
-    if (toggle) {
-        // Remover listeners previos para evitar duplicados
-        toggle.replaceWith(toggle.cloneNode(true));
-        const newToggle = document.getElementById("dark-mode-toggle");
-
-        newToggle.addEventListener("click", () => {
-            const currentlyDark = document.documentElement.classList.contains("dark");
-            const newDarkState = !currentlyDark;
-
-            localStorage.setItem("dark-mode", newDarkState);
-            applyTheme(newDarkState);
-
-            // Re-renderizar gráfico si existe
-            if (typeof progressChart !== "undefined" && progressChart) {
-                fetchProgressData();
-            }
-        });
-    }
+    // 4. Asignación delegada de eventos (sombra/escucha global de clics)
+    document.addEventListener("click", (e) => {
+        const toggleBtn = e.target.closest(
+            "#dark-mode-toggle, .dark-mode-toggle",
+        );
+        if (toggleBtn) {
+            e.preventDefault();
+            const currentlyDark =
+                document.documentElement.classList.contains("dark");
+            window.applyTheme(!currentlyDark);
+        }
+    });
 }
 
 // --- WAVEFORM AUDIO VISUALIZER ---
@@ -245,7 +261,7 @@ function drawWaveform(canvas, ctx) {
 // --- ESTADÍSTICAS DEL USUARIO Y XP ---
 async function fetchUserStats() {
     try {
-        const res = await conectarConServidorRender('/api/user/stats');
+        const res = await conectarConServidorRender("/api/user/stats");
         if (!res.ok) return;
         const stats = await res.json();
         userStats = stats;
@@ -263,7 +279,9 @@ async function fetchUserStats() {
 
 async function updateUserXP(xpGain) {
     try {
-        const res = await conectarConServidorRender('/api/user/update-xp?xp_gain=' + xpGain);
+        const res = await conectarConServidorRender(
+            "/api/user/update-xp?xp_gain=" + xpGain,
+        );
         if (res.ok) {
             await fetchUserStats();
             showXPPopup(xpGain);
@@ -285,7 +303,9 @@ function showXPPopup(gain) {
 // --- GRÁFICO DE PROGRESO ---
 async function fetchProgressData() {
     try {
-        const res = await conectarConServidorRender('/api/user/progress?days=30');
+        const res = await conectarConServidorRender(
+            "/api/user/progress?days=30",
+        );
         if (!res.ok) return;
         const data = await res.json();
         const canvas = document.getElementById("progress-chart");
@@ -407,7 +427,7 @@ async function completeMission(missionId, btnElement) {
         // POST con mission_id como query param en la URL
         const res = await conectarConServidorRender(
             `/api/daily-challenge/complete?mission_id=${missionId}`,
-            "POST"
+            "POST",
         );
 
         if (res.ok) {
@@ -447,7 +467,7 @@ async function fetchCurriculum() {
     const display = document.getElementById("text-display");
 
     try {
-        const res = await conectarConServidorRender('/api/curriculum');
+        const res = await conectarConServidorRender("/api/curriculum");
         if (!res.ok) throw new Error("Servidor no disponible");
 
         curriculumData = await res.json();
@@ -531,14 +551,14 @@ function playNaturalAudio(text, voice = "en-US-AriaNeural") {
 
     // 1. Mostrar aviso de carga con SweetAlert2 para bloquear clics
     Swal.fire({
-        title: 'Generando audio...',
-        text: 'Por favor espera la respuesta del servidor',
+        title: "Generando audio...",
+        text: "Por favor espera la respuesta del servidor",
         allowOutsideClick: false,
         allowEscapeKey: false,
         showConfirmButton: false,
         didOpen: () => {
             Swal.showLoading();
-        }
+        },
     });
 
     const audioUrl = `${API_BASE_URL}/api/tts-natural?text=${encodeURIComponent(text)}&voice=${voice}`;
@@ -565,7 +585,7 @@ function playNaturalAudio(text, voice = "en-US-AriaNeural") {
         window.speechSynthesis.cancel();
         const utterance = new SpeechSynthesisUtterance(text);
         utterance.lang = "en-US";
-        
+
         utterance.onstart = () => {
             Swal.close();
         };
@@ -575,7 +595,7 @@ function playNaturalAudio(text, voice = "en-US-AriaNeural") {
         utterance.onerror = () => {
             releaseAudio();
         };
-        
+
         window.speechSynthesis.speak(utterance);
     };
 
@@ -586,7 +606,7 @@ function playNaturalAudio(text, voice = "en-US-AriaNeural") {
         window.speechSynthesis.cancel();
         const utterance = new SpeechSynthesisUtterance(text);
         utterance.lang = "en-US";
-        
+
         utterance.onstart = () => {
             Swal.close();
         };
@@ -596,18 +616,18 @@ function playNaturalAudio(text, voice = "en-US-AriaNeural") {
         utterance.onerror = () => {
             releaseAudio();
         };
-        
+
         window.speechSynthesis.speak(utterance);
     });
 }
 
 function playTargetAudio(btnElement = null) {
     if (processing.audio) return;
-    
+
     if (btnElement) {
         btnElement.disabled = true;
         btnElement.classList.add("opacity-50", "cursor-not-allowed");
-        
+
         // Re-habilitar botón tras 3 segundos o cuando el audio empiece
         setTimeout(() => {
             btnElement.disabled = false;
@@ -744,7 +764,10 @@ async function evaluatePronunciation(spokenText) {
     try {
         const response = await fetch(`${API_BASE_URL}/api/evaluate-reading`, {
             method: "POST",
-            headers: { Authorization: `Bearer ${authToken}`,"Content-Type": "application/json" },
+            headers: {
+                Authorization: `Bearer ${authToken}`,
+                "Content-Type": "application/json",
+            },
             body: JSON.stringify({
                 target_text: currentUnit.text,
                 spoken_text: spokenText,
@@ -856,7 +879,10 @@ async function analyzeWriting(e) {
     if (processing.writing) return;
     processing.writing = true;
 
-    showLoadingAlert("Analizando gramática", "Enviando tu texto al servidor...");
+    showLoadingAlert(
+        "Analizando gramática",
+        "Enviando tu texto al servidor...",
+    );
 
     const btn = document.getElementById("btn-analyze-writing");
     btn.disabled = true;
@@ -888,7 +914,10 @@ async function analyzeWriting(e) {
 
         const response = await fetch(`${API_BASE_URL}/api/check-writing`, {
             method: "POST",
-            headers: { Authorization: `Bearer ${authToken}`, "Content-Type": "application/json" },
+            headers: {
+                Authorization: `Bearer ${authToken}`,
+                "Content-Type": "application/json",
+            },
             body: JSON.stringify({ text }),
         });
 
@@ -991,7 +1020,7 @@ function startShadowingRoutine() {
 // --- REPETICIÓN ESPACIADA (SRS) ---
 async function fetchSRSStats() {
     try {
-        const res = await conectarConServidorRender('/api/srs/stats');
+        const res = await conectarConServidorRender("/api/srs/stats");
 
         if (!res.ok) return;
         const stats = await res.json();
@@ -1012,7 +1041,7 @@ async function fetchSRSStats() {
 
 async function fetchSRSDueWords() {
     try {
-        const res = await conectarConServidorRender('/api/srs/due-words');
+        const res = await conectarConServidorRender("/api/srs/due-words");
 
         if (!res.ok) return;
         const data = await res.json();
@@ -1026,24 +1055,37 @@ async function fetchSRSDueWords() {
 
 //localStorage.clear();
 /*
-* Petición GET normal (sin cambios): const res = await conectarConServidorRender("/api/daily-challenge");
-* Petición POST con Query Param (como el de tus misiones): const res = await conectarConServidorRender(`/api/daily-challenge/complete?mission_id=${missionId}`, "POST");
-* Petición POST con cuerpo JSON: const res = await conectarConServidorRender("/api/user/update-xp", "POST", { xp: 15 });
-*/
-async function conectarConServidorRender(endpoint, method = "GET", body = null, showLoading = false) {
+ * Petición GET normal (sin cambios): const res = await conectarConServidorRender("/api/daily-challenge");
+ *
+ * Petición POST con Query Param (como el de tus misiones): const res = await conectarConServidorRender(`/api/daily-challenge/complete?mission_id=${missionId}`, "POST");
+ *
+ * Petición POST con cuerpo JSON: const res = await conectarConServidorRender("/api/user/update-xp", "POST", { xp: 15 });
+ *
+ */
+async function conectarConServidorRender(
+    endpoint,
+    method = "GET",
+    body = null,
+    showLoading = false,
+) {
     if (!authToken) {
-        console.error("No se encontró token de autenticación, inicie sesión de nuevo.");
+        console.error(
+            "No se encontró token de autenticación, inicie sesión de nuevo.",
+        );
         showLoginModal();
         return { ok: false, status: 401 };
     }
 
     if (showLoading) {
-        showLoadingAlert("Conectando con el servidor", "Sincronizando datos...");
+        showLoadingAlert(
+            "Conectando con el servidor",
+            "Sincronizando datos...",
+        );
     }
 
     try {
         const headers = {
-            "Authorization": `Bearer ${authToken}`
+            Authorization: `Bearer ${authToken}`,
         };
 
         // Si se envía un cuerpo, añadimos el tipo de contenido
@@ -1053,7 +1095,7 @@ async function conectarConServidorRender(endpoint, method = "GET", body = null, 
 
         const config = {
             method: method,
-            headers: headers
+            headers: headers,
         };
 
         if (body && method !== "GET") {
@@ -1122,7 +1164,10 @@ async function submitSRSReview(success) {
         const currentCard = srsDueWords[currentSRSIndex];
         const res = await fetch(`${API_BASE_URL}/api/srs/review`, {
             method: "POST",
-            headers: {  Authorization: `Bearer ${authToken}`, "Content-Type": "application/json" },
+            headers: {
+                Authorization: `Bearer ${authToken}`,
+                "Content-Type": "application/json",
+            },
             body: JSON.stringify({ word: currentCard.word, success }),
         });
         if (res.ok) {
@@ -1152,7 +1197,7 @@ async function submitSRSReview(success) {
 // --- IPA MATRIZ FONÉTICA ---
 async function fetchIPAMatrix() {
     try {
-        const res = await conectarConServidorRender('/api/ipa-matrix');
+        const res = await conectarConServidorRender("/api/ipa-matrix");
 
         if (!res.ok) return;
         const data = await res.json();
@@ -1197,6 +1242,9 @@ function renderPhonemeCategory(containerId, items) {
             const typeColor =
                 IPA_TYPE_COLORS[item.type] || IPA_TYPE_DEFAULT_COLOR;
 
+            // ID único combinando el contenedor y el índice de la tarjeta
+            const uniqueId = `${containerId}-${index}`;
+
             return `
       <div class="phoneme-card group bg-white dark:bg-slate-800 rounded-2xl shadow-sm hover:shadow-lg border border-slate-200 dark:border-slate-700 hover:border-cyan-400 dark:hover:border-cyan-500 transition-all duration-200 p-4 cursor-pointer"
            data-index="${index}"
@@ -1236,14 +1284,14 @@ function renderPhonemeCategory(containerId, items) {
         </div>
 
         <div class="mt-3 text-center">
-          <button onclick="event.stopPropagation(); toggleDetails(this, ${index})" 
+          <button onclick="event.stopPropagation(); toggleDetails(this, '${uniqueId}')" 
                   class="text-[11px] font-medium text-cyan-600 dark:text-cyan-400 hover:underline focus:outline-none flex items-center justify-center gap-1.5 w-full">
             <i class="fa-regular fa-book-open text-cyan-600 dark:text-cyan-400 text-xs"></i>
             <span class="btn-toggle-text">Ver más</span>
           </button>
         </div>
 
-        <div id="details-${index}" class="hidden mt-3 pt-3 border-t border-slate-200 dark:border-slate-700 text-xs text-slate-600 dark:text-slate-300 space-y-2">
+        <div id="details-${uniqueId}" class="hidden mt-3 pt-3 border-t border-slate-200 dark:border-slate-700 text-xs text-slate-600 dark:text-slate-300 space-y-2">
           <div>
             <i class="fa-regular fa-lightbulb text-amber-400 dark:text-amber-300 text-xs mr-1.5"></i>
             <span class="font-semibold">Similar a:</span> ${item.spanish_equivalent_or_hack}
@@ -1266,8 +1314,8 @@ function renderPhonemeCategory(containerId, items) {
         })
         .join("");
 
-    window.toggleDetails = function (btn, index) {
-        const details = document.getElementById(`details-${index}`);
+    window.toggleDetails = function (btn, uniqueId) {
+        const details = document.getElementById(`details-${uniqueId}`);
         if (details) {
             const isHidden = details.classList.contains("hidden");
             details.classList.toggle("hidden");
@@ -1288,8 +1336,8 @@ function renderPhonemeCategory(containerId, items) {
 // --- ROLEPLAY MODULO ---
 async function initRoleplayModule() {
     try {
-        const res = await conectarConServidorRender('/api/roleplay/scenarios');
-   
+        const res = await conectarConServidorRender("/api/roleplay/scenarios");
+
         if (!res.ok) return;
         const scenarios = await res.json();
 
@@ -1474,7 +1522,10 @@ async function sendRoleplayMessage(e) {
     if (processing.roleplay) return;
     processing.roleplay = true;
 
-    showLoadingAlert("Procesando respuesta roleplay", "El tutor AI está respondiendo...");
+    showLoadingAlert(
+        "Procesando respuesta roleplay",
+        "El tutor AI está respondiendo...",
+    );
 
     const btn = document.getElementById("btn-send-rp");
     btn.disabled = true;
@@ -1496,7 +1547,10 @@ async function sendRoleplayMessage(e) {
 
         const res = await fetch(`${API_BASE_URL}/api/roleplay/respond`, {
             method: "POST",
-            headers: { Authorization: `Bearer ${authToken}`, "Content-Type": "application/json" },
+            headers: {
+                Authorization: `Bearer ${authToken}`,
+                "Content-Type": "application/json",
+            },
             body: JSON.stringify({
                 scenario_id: currentScenario.id,
                 user_message: userText,
@@ -1595,7 +1649,7 @@ async function startPlacementTestProcess() {
         history: [],
     };
     try {
-        const res = await conectarConServidorRender('/api/placement/start');
+        const res = await conectarConServidorRender("/api/placement/start");
         if (!res.ok) return;
         const data = await res.json();
 
@@ -1672,7 +1726,10 @@ async function submitPlacementAnswer() {
     try {
         const res = await fetch(`${API_BASE_URL}/api/placement/next`, {
             method: "POST",
-            headers: { Authorization: `Bearer ${authToken}`, "Content-Type": "application/json" },
+            headers: {
+                Authorization: `Bearer ${authToken}`,
+                "Content-Type": "application/json",
+            },
             body: JSON.stringify({
                 current_level: ptState.currentLevel,
                 question_id: ptState.questionId,
@@ -1750,7 +1807,7 @@ async function renderCurriculum() {
     if (!container) return;
 
     try {
-        const res = await conectarConServidorRender('/api/curriculum');
+        const res = await conectarConServidorRender("/api/curriculum");
         if (!res.ok) return;
         const curriculum = await res.json();
 
@@ -1915,12 +1972,15 @@ async function handleLogin(e) {
     errorText.classList.add("hidden");
 
     try {
-        const { data, error } = await supabaseClient.auth.signInWithPassword({ email, password });
+        const { data, error } = await supabaseClient.auth.signInWithPassword({
+            email,
+            password,
+        });
         if (error) throw error;
 
         authToken = data.session.access_token;
         currentUsername = data.user.email;
-        
+
         // Guardar explícitamente en localStorage
         localStorage.setItem("auth_token", authToken);
         localStorage.setItem("current_username", currentUsername);
@@ -1928,9 +1988,10 @@ async function handleLogin(e) {
         hideLoginModal();
         initializeApp();
     } catch (err) {
-        errorText.textContent = err.message === "Invalid login credentials"
-            ? "Correo o contraseña incorrectos."
-            : "No se pudo conectar. Intenta de nuevo.";
+        errorText.textContent =
+            err.message === "Invalid login credentials"
+                ? "Correo o contraseña incorrectos."
+                : "No se pudo conectar. Intenta de nuevo.";
         errorText.classList.remove("hidden");
     } finally {
         btn.disabled = false;
@@ -1951,7 +2012,10 @@ async function handleLogout() {
 
 // Envuelve las llamadas iniciales para ejecutarlas SÓLO tras confirmar la sesión activa
 function initializeApp() {
-    const savedUser = localStorage.getItem("username") || localStorage.getItem("current_username") || "Estudiante";
+    const savedUser =
+        localStorage.getItem("username") ||
+        localStorage.getItem("current_username") ||
+        "Estudiante";
     updateNavUserProfile(savedUser);
 
     fetchCurriculum();
@@ -1987,7 +2051,10 @@ function updateNavUserProfile(username, level = "A1") {
 }
 
 // Muestra el modal de carga bloqueando clics externos
-function showLoadingAlert(title = "Procesando...", text = "Por favor espera mientras el servidor responde.") {
+function showLoadingAlert(
+    title = "Procesando...",
+    text = "Por favor espera mientras el servidor responde.",
+) {
     Swal.fire({
         title: title,
         text: text,
@@ -1996,7 +2063,7 @@ function showLoadingAlert(title = "Procesando...", text = "Por favor espera mien
         showConfirmButton: false,
         didOpen: () => {
             Swal.showLoading();
-        }
+        },
     });
 }
 
