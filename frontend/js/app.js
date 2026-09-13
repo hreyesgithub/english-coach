@@ -62,7 +62,7 @@ const processing = {
     audio: false, // para playNaturalAudio
 };
 
-// --- 1. INICIALIZACIÓN ---
+// --- INICIALIZACIÓN ---
 document.addEventListener("DOMContentLoaded", async () => {
     initDarkMode();
     setupSpeechRecognition();
@@ -155,13 +155,14 @@ function clearSessionStorage() {
     localStorage.removeItem("current_username");
 }
 
-// --- MODO OSCURO (CORREGIDO) ---
 function initDarkMode() {
     // 1. Determinar el tema según preferencia guardada o del sistema operativo
     const savedTheme = localStorage.getItem("dark-mode");
+
     const systemPrefersDark = window.matchMedia(
         "(prefers-color-scheme: dark)",
     ).matches;
+
     const isDark =
         savedTheme !== null ? savedTheme === "true" : systemPrefersDark;
 
@@ -1225,8 +1226,8 @@ const IPA_TYPE_COLORS = {
     Approximant:
         "bg-indigo-100 text-indigo-800 dark:bg-indigo-900/50 dark:text-indigo-300",
 };
-const IPA_TYPE_DEFAULT_COLOR =
-    "bg-slate-100 text-slate-700 dark:bg-slate-700 dark:text-slate-300";
+
+const IPA_TYPE_DEFAULT_COLOR = "bg-slate-100 text-slate-700 dark:bg-slate-700 dark:text-slate-300";
 
 function renderPhonemeCategory(containerId, items) {
     const grid = document.getElementById(containerId);
