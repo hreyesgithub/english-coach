@@ -800,27 +800,44 @@ async def roleplay_respond(data: RoleplayMessageRequest, request: Request):
     )
 
     history = list(data.conversation_history)
+    
+    # Asegurar que el último mensaje del usuario esté registrado
     last = history[-1] if history else None
-    if not (
-        last and last.get("role") == "user" and last.get("content") == data.user_message
-    ):
+    if not (last and last.get("role") == "user" and last.get("content") == data.user_message):
         history.append({"role": "user", "content": data.user_message})
 
     try:
         model = get_gemini_model(system_prompt)
         if model:
             gemini_history = []
+            
+            # Sanitizar el historial para Gemini
             for msg in history[:-1]:
+                content = (msg.get("content") or "").strip()
+                if not content:
+                    continue # Omitir mensajes vacíos
+                
                 role = "model" if msg.get("role") == "assistant" else "user"
-                gemini_history.append({"role": role, "parts": [msg.get("content", "")]})
+                
+                # Gemini exigen que el historial empiece obligatoriamente por 'user'
+                if not gemini_history and role != "user":
+                    continue
+                
+                # Evitar roles duplicados consecutivos en el historial
+                if gemini_history and gemini_history[-1]["role"] == role:
+                    gemini_history[-1]["parts"][0] += f"\n{content}"
+                else:
+                    gemini_history.append({"role": role, "parts": [content]})
 
             chat = model.start_chat(history=gemini_history)
             response = chat.send_message(data.user_message)
             bot_reply = response.text
         else:
             bot_reply = "Thank you. I have received your message!"
+
     except Exception as e:
-        logger.exception(f"Error en Gemini Roleplay: {e}")
+        logger.exception(f"Error específico en Gemini Roleplay: {e}")
+        # Puedes revisar la consola de tu servidor/backend para ver la causa exacta en logger.exception
         bot_reply = "I'm sorry, I couldn't process that. Could you repeat?"
 
     return {
