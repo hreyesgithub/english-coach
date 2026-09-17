@@ -377,15 +377,13 @@ async function fetchProgressData() {
 // --- DESAFÍO DIARIO ACORDE AL NIVEL ---
 async function fetchDailyChallenge() {
     try {
-        // Obtenemos el nivel actual del usuario (por defecto A1 si está fallando)
         const userLevel = userStats.level || "A1";
 
-        // Pasamos el nivel y el token como parámetros para que el backend devuelva desafíos personalizados
         const res = await fetch(
             `${API_BASE_URL}/api/daily-challenge?level=${userLevel}`,
             {
                 headers: {
-                    Authorization: `Bearer ${authToken}`, // Enviando token al backend
+                    Authorization: `Bearer ${authToken}`,
                 },
             },
         );
@@ -396,19 +394,44 @@ async function fetchDailyChallenge() {
         if (!container) return;
 
         container.innerHTML = data.missions
-            .map(
-                (m) => `
-            <div class="bg-slate-50 dark:bg-slate-700/60 p-4 rounded-xl border border-slate-200 dark:border-slate-600">
+            .map((m) => {
+                const isCompleted = Boolean(m.completed);
+
+                return `
+            <div class="p-4 rounded-xl border transition-all duration-200 ${
+                isCompleted
+                    ? "bg-emerald-50/50 dark:bg-emerald-950/20 border-emerald-200 dark:border-emerald-800/50 opacity-80"
+                    : "bg-slate-50 dark:bg-slate-700/60 border-slate-200 dark:border-slate-600"
+            }">
                 <div class="flex items-center justify-between mb-2">
-                    <span class="text-sm font-bold text-amber-700 dark:text-amber-400">
+                    <span class="text-sm font-bold ${
+                        isCompleted
+                            ? "text-emerald-700 dark:text-emerald-400"
+                            : "text-amber-700 dark:text-amber-400"
+                    }">
                         Nivel ${userLevel} - Misión ${m.id}
                     </span>
-                    <button onclick="completeMission(${m.id}, this)" class="text-xs bg-amber-600 hover:bg-amber-700 text-white px-3 py-1 rounded-lg transition font-semibold">Completar</button>
+                    <button 
+                        onclick="completeMission(${m.id}, this)" 
+                        ${isCompleted ? "disabled" : ""} 
+                        class="text-xs px-3 py-1 rounded-lg transition font-semibold flex items-center gap-1 ${
+                            isCompleted
+                                ? "bg-slate-300 dark:bg-slate-700 text-slate-500 dark:text-slate-400 cursor-not-allowed"
+                                : "bg-amber-600 hover:bg-amber-700 text-white shadow-sm"
+                        }">
+                        ${
+                            isCompleted
+                                ? '<i class="fa-solid fa-check"></i> Completado'
+                                : "Completar"
+                        }
+                    </button>
                 </div>
-                <p class="text-slate-800 dark:text-slate-100 font-medium">${m.text}</p>
+                <p class="text-slate-800 dark:text-slate-100 font-medium ${
+                    isCompleted ? "line-through text-slate-500 dark:text-slate-400" : ""
+                }">${m.text}</p>
             </div>
-        `,
-            )
+        `;
+            })
             .join("");
     } catch (e) {
         console.error("Error en Desafío Diario:", e);
@@ -433,6 +456,20 @@ async function completeMission(missionId, btnElement) {
 
         if (res.ok) {
             const data = await res.json();
+
+            // Cambiar visualmente el botón a completado e inhabilitarlo
+            if (btnElement) {
+                btnElement.disabled = true;
+                btnElement.className = "text-xs px-3 py-1 rounded-lg font-semibold flex items-center gap-1 bg-slate-300 dark:bg-slate-700 text-slate-500 dark:text-slate-400 cursor-not-allowed";
+                btnElement.innerHTML = '<i class="fa-solid fa-check"></i> Completado';
+                
+                // Opcional: atenuar el contenedor padre
+                const card = btnElement.closest('div.p-4');
+                if (card) {
+                    card.classList.add("bg-emerald-50/50", "dark:bg-emerald-950/20", "border-emerald-200", "opacity-80");
+                }
+            }
+
             await Swal.fire({
                 icon: "success",
                 title: "¡Misión completada!",
