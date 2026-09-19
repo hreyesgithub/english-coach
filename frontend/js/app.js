@@ -90,41 +90,66 @@ function makeSafeId(str) {
 }
 
 // Para el backend de Render, que puede entrar en "cold start" y tardar en responder
-function setBackendStatus(status, message = "") {
+function setBackendStatus(status) {
     backendStatus = status;
     const banner = document.getElementById("backend-status-banner");
     if (!banner) return;
 
     const configs = {
         waking: {
-            html: `<i class="fa-solid fa-server fa-spin"></i>
-                   <span>El servidor está despertando… (hasta 60 s en la primera carga)</span>`,
-            cls: "bg-amber-100 dark:bg-amber-950/60 text-amber-900 dark:text-amber-200 border-amber-300 dark:border-amber-700",
+            bg: "#fef3c7",
+            color: "#78350f",
+            border: "#fcd34d",
+            icon: "fa-solid fa-server",
+            iconAnim: "fa-spin",
+            text: "El servidor está despertando… (hasta 60 s en la primera carga)",
         },
         ready: {
-            html: `<i class="fa-solid fa-circle-check"></i>
-                   <span>Servidor listo</span>`,
-            cls: "bg-emerald-100 dark:bg-emerald-950/60 text-emerald-900 dark:text-emerald-200 border-emerald-300 dark:border-emerald-700",
+            bg: "#d1fae5",
+            color: "#064e3b",
+            border: "#6ee7b7",
+            icon: "fa-solid fa-circle-check",
+            iconAnim: "",
+            text: "Servidor listo",
         },
         down: {
-            html: `<i class="fa-solid fa-triangle-exclamation"></i>
-                   <span>No se pudo contactar con el servidor. Revisa tu conexión.</span>`,
-            cls: "bg-rose-100 dark:bg-rose-950/60 text-rose-900 dark:text-rose-200 border-rose-300 dark:border-rose-700",
+            bg: "#fee2e2",
+            color: "#7f1d1d",
+            border: "#fca5a5",
+            icon: "fa-solid fa-triangle-exclamation",
+            iconAnim: "",
+            text: "No se pudo contactar con el servidor. Revisa tu conexión.",
         },
     };
 
     const cfg = configs[status];
     if (!cfg) {
-        banner.classList.add("hidden");
+        banner.style.display = "none";
         return;
     }
-    banner.className =
-        `fixed top-0 left-0 right-0 z-[9999] px-4 py-2 text-sm font-semibold border-b flex items-center justify-center gap-2 transition-all ${cfg.cls}`;
-    banner.innerHTML = cfg.html;
+
     banner.classList.remove("hidden");
+    banner.style.cssText = `
+        position: fixed;
+        top: 0; left: 0; right: 0;
+        z-index: 9999;
+        padding: 10px 16px;
+        font-family: inherit;
+        font-size: 14px;
+        font-weight: 600;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+        background: ${cfg.bg};
+        color: ${cfg.color};
+        border-bottom: 1px solid ${cfg.border};
+        box-shadow: 0 2px 6px rgba(0,0,0,0.08);
+    `;
+    banner.innerHTML = `<i class="${cfg.icon} ${cfg.iconAnim}"></i><span>${cfg.text}</span>`;
 
     if (status === "ready") {
-        setTimeout(() => banner.classList.add("hidden"), 2000);
+        setTimeout(() => { banner.style.display = "none"; }, 2000);
     }
 }
 
@@ -145,7 +170,7 @@ async function wakeUpBackend(timeoutMs = 90000) {
             try {
                 const ctrl = new AbortController();
                 const t = setTimeout(() => ctrl.abort(), 15000);
-                const res = await apiFetch(`${API_BASE_URL}/`, {
+                const res = await apiFetch("/", {
                     method: "GET",
                     signal: ctrl.signal,
                     cache: "no-store",
@@ -492,8 +517,8 @@ async function fetchProgressData() {
 async function fetchDailyChallenge() {
     try {
         const userLevel = userStats.level || "A1";
-        const res = await fetch(
-            `${API_BASE_URL}/api/daily-challenge?level=${userLevel}`,
+        const res = await apiFetch(
+            `/api/daily-challenge?level=${encodeURIComponent(userLevel)}`,
             { headers: { Authorization: `Bearer ${authToken}` } },
         );
         if (!res.ok) return;
@@ -854,8 +879,8 @@ async function startRecording() {
             formData.append("target_text", currentUnit ? currentUnit.text : "");
 
             try {
-                const res = await fetch(
-                    `${API_BASE_URL}/api/evaluate-reading`,
+                const res = await apiFetch(
+                    "/api/evaluate-reading",
                     {
                         headers: {
                             Authorization: `Bearer ${authToken}`, // Enviando token al backend
@@ -919,7 +944,7 @@ function stopRecording() {
 async function evaluatePronunciation(spokenText) {
     if (!currentUnit) return;
     try {
-        const response = await apiFetch(`${API_BASE_URL}/api/evaluate-reading`, {
+        const response = await apiFetch("/api/evaluate-reading", {
             method: "POST",
             headers: {
                 Authorization: `Bearer ${authToken}`,
@@ -1072,7 +1097,7 @@ async function analyzeWriting(e) {
                 <i class="fa-solid fa-circle-notch fa-spin"></i> Analizando texto...
             </div>`;
 
-        const response = await apiFetch(`${API_BASE_URL}/api/check-writing`, {
+        const response = await apiFetch("/api/check-writing", {
             method: "POST",
             headers: {
                 Authorization: `Bearer ${authToken}`,
@@ -1234,16 +1259,12 @@ async function conectarConServidorRender(
         return { ok: false, status: 401 };
     }
 
-    // Si sabemos que está dormido, avisamos al usuario primero
-    if (backendStatus !== "ready") {
-        await wakeUpBackend(); // muestra el banner "despertando…"
-    }
+    if (backendStatus !== "ready") await wakeUpBackend();
 
     let loadingTimer = null;
     if (showLoading) {
         showLoadingAlert("Conectando con el servidor", "Sincronizando datos…");
     } else {
-        // Aviso diferido: si el fetch tarda > 2 s, mostramos toast
         loadingTimer = setTimeout(() => {
             Swal.fire({
                 toast: true,
@@ -1258,28 +1279,21 @@ async function conectarConServidorRender(
         }, 2000);
     }
 
-    const controller = new AbortController();
-    // Cold start de Render free: hasta 90 s de margen
-    const timeoutId = setTimeout(() => controller.abort(), 90000);
-
     try {
         const headers = { Authorization: `Bearer ${authToken}` };
         if (body && method !== "GET") headers["Content-Type"] = "application/json";
 
-        const config = { method, headers, signal: controller.signal };
+        const config = { method, headers };
         if (body && method !== "GET") config.body = JSON.stringify(body);
 
-        const response = await apiFetch(`${API_BASE_URL}${endpoint}`, config);
+        // ✅ endpoint ya empieza por "/api/..."
+        const response = await apiFetch(endpoint, config);
 
         if (response.status === 401) {
             console.error("Sesión expirada (401).");
             handleLogout();
             return { ok: false, status: 401 };
         }
-
-        // Si el backend respondió, ya está despierto
-        if (backendStatus !== "ready") setBackendStatus("ready");
-
         return response;
     } catch (error) {
         if (error.name === "AbortError") {
@@ -1296,7 +1310,6 @@ async function conectarConServidorRender(
         }
         return { ok: false, status: 500 };
     } finally {
-        clearTimeout(timeoutId);
         if (loadingTimer) clearTimeout(loadingTimer);
         if (showLoading) hideLoadingAlert();
     }
@@ -1343,7 +1356,7 @@ async function submitSRSReview(success) {
     try {
         if (srsDueWords.length === 0 || !srsDueWords[currentSRSIndex]) return;
         const currentCard = srsDueWords[currentSRSIndex];
-        const res = await apiFetch(`${API_BASE_URL}/api/srs/review`, {
+        const res = await apiFetch("/api/srs/review", {
             method: "POST",
             headers: {
                 Authorization: `Bearer ${authToken}`,
@@ -1854,7 +1867,7 @@ async function sendRoleplayMessage(e) {
         roleplayHistory.push({ role: "user", content: userText });
         input.value = "";
 
-        const res = await apiFetch(`${API_BASE_URL}/api/roleplay/respond`, {
+        const res = await apiFetch("/api/roleplay/respond", {
             method: "POST",
             headers: {
                 Authorization: `Bearer ${authToken}`,
@@ -2035,7 +2048,7 @@ async function submitPlacementAnswer() {
     btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Enviando...';
 
     try {
-        const res = await apiFetch(`${API_BASE_URL}/api/placement/next`, {
+        const res = await apiFetch("/api/placement/next", {
             method: "POST",
             headers: {
                 Authorization: `Bearer ${authToken}`,
@@ -2409,12 +2422,19 @@ async function apiFetch(path, options = {}) {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 90000);
 
+    // Si el caller pasó un signal, lo respetamos
+    const ext = options.signal;
+    if (ext) {
+        if (ext.aborted) controller.abort();
+        else ext.addEventListener("abort", () => controller.abort(), { once: true });
+    }
+
     try {
         const res = await fetch(`${API_BASE_URL}${path}`, {
             ...options,
             signal: controller.signal,
         });
-        if (res.status === 401) { handleLogout(); }
+        if (res.status === 401) handleLogout();
         if (backendStatus !== "ready") setBackendStatus("ready");
         return res;
     } finally {

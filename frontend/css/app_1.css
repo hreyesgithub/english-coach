@@ -118,3 +118,9 @@ header {
     font-size: 0.58rem; /* ~9px */
     line-height: 1;
 }
+
+.material-symbols-outlined {
+    font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 20;
+    font-size: 1.1em;
+    vertical-align: middle;
+}
