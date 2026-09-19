@@ -31,7 +31,11 @@ from fastapi import (
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, StreamingResponse
 
-import google.generativeai as genai
+# Google Gemini API (Generative AI) para roleplay y escritura
+from google import genai
+from google.genai import types
+import os
+
 from pydantic import BaseModel
 from starlette.middleware.base import BaseHTTPMiddleware
 from uvicorn.protocols.utils import ClientDisconnected
@@ -88,7 +92,7 @@ else:
     logger.info("AssemblyAI configurado correctamente.")
 
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
-GEMINI_MODEL_NAME = os.getenv("GEMINI_MODEL_NAME", "gemini-1.5-flash")
+GEMINI_MODEL_NAME = os.getenv("GEMINI_MODEL_NAME", "gemini-2.5-flash")
 _gemini_model = None
 if GEMINI_API_KEY:
     genai.configure(api_key=GEMINI_API_KEY)  # type: ignore
@@ -98,6 +102,8 @@ else:
         "GEMINI_API_KEY no configurada: el Roleplay usará respuestas de respaldo."
     )
 
+# Inicializar cliente de Gemini para uso general
+clientGemini = genai.Client(api_key=os.environ.get("GEMINI_API_KEY"))
 
 def get_gemini_model(system_instruction: str):
     """Crea (o reutiliza) el modelo Gemini con instrucción de sistema nativa."""
@@ -793,51 +799,48 @@ async def roleplay_respond(data: RoleplayMessageRequest, request: Request):
     if not scenario:
         raise HTTPException(status_code=404, detail="Escenario no encontrado")
 
-    system_prompt = (
+    system_instruction = (
         "Eres un tutor de inglés (AI Language Coach) empático y motivador. "
         "Responde de forma natural, corrigiendo gramática y pronunciación sin romper la fluidez. "
         f"Escenario: {scenario['title']}. Tu rol: {scenario['role']}."
     )
 
-    history = list(data.conversation_history)
-    
-    # Asegurar que el último mensaje del usuario esté registrado
-    last = history[-1] if history else None
-    if not (last and last.get("role") == "user" and last.get("content") == data.user_message):
-        history.append({"role": "user", "content": data.user_message})
+    # 1. Construir el historial compatible con el nuevo SDK
+    formatted_contents = []
+    for msg in data.conversation_history:
+        role = "model" if msg.get("role") == "assistant" else "user"
+        content = (msg.get("content") or "").strip()
+        if content:
+            formatted_contents.append(
+                types.Content(
+                    role=role,
+                    parts=[types.Part.from_text(text=content)]
+                )
+            )
+
+    # 2. Asegurar que el mensaje actual del usuario esté al final
+    if not formatted_contents or formatted_contents[-1].parts[0].text != data.user_message:
+        formatted_contents.append(
+            types.Content(
+                role="user",
+                parts=[types.Part.from_text(text=data.user_message)]
+            )
+        )
 
     try:
-        model = get_gemini_model(system_prompt)
-        if model:
-            gemini_history = []
-            
-            # Sanitizar el historial para Gemini
-            for msg in history[:-1]:
-                content = (msg.get("content") or "").strip()
-                if not content:
-                    continue # Omitir mensajes vacíos
-                
-                role = "model" if msg.get("role") == "assistant" else "user"
-                
-                # Gemini exigen que el historial empiece obligatoriamente por 'user'
-                if not gemini_history and role != "user":
-                    continue
-                
-                # Evitar roles duplicados consecutivos en el historial
-                if gemini_history and gemini_history[-1]["role"] == role:
-                    gemini_history[-1]["parts"][0] += f"\n{content}"
-                else:
-                    gemini_history.append({"role": role, "parts": [content]})
-
-            chat = model.start_chat(history=gemini_history)
-            response = chat.send_message(data.user_message)
-            bot_reply = response.text
-        else:
-            bot_reply = "Thank you. I have received your message!"
+        # 3. Llamada directa con el cliente moderno de Google GenAI
+        response = clientGemini.models.generate_content(
+            model='gemini-2.5-flash',
+            contents=formatted_contents,
+            config=types.GenerateContentConfig(
+                system_instruction=system_instruction,
+                temperature=0.7,
+            )
+        )
+        bot_reply = response.text
 
     except Exception as e:
         logger.exception(f"Error específico en Gemini Roleplay: {e}")
-        # Puedes revisar la consola de tu servidor/backend para ver la causa exacta en logger.exception
         bot_reply = "I'm sorry, I couldn't process that. Could you repeat?"
 
     return {

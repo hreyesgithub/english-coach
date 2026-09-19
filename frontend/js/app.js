@@ -2,6 +2,12 @@
 // LinguaBoost Pro - Frontend Application Engine (v4.6)
 // ==========================================
 
+// ============================================================
+// GESTIÓN DEL COLD START DE RENDER
+// ============================================================
+let backendStatus = "unknown"; // 'unknown' | 'waking' | 'ready' | 'down'
+let warmupPromise = null;
+
 // Para pruebas locales
 //const API_BASE_URL = "http://127.0.0.1:8000";
 // Para pruebas en Render
@@ -62,10 +68,118 @@ const processing = {
     audio: false, // para playNaturalAudio
 };
 
+// ============================================================
+// SEGURIDAD — ESCAPE Y UTILIDADES
+// ============================================================
+// Helper para escapar caracteres HTML y prevenir XSS
+function escapeHtml(str) {
+    return String(str ?? "")
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#039;");
+}
+
+// Para atributos que ya están entre comillas dobles, es el mismo caso
+const escapeAttr = escapeHtml;
+
+// Helper para IDs seguros (evita colisiones y caracteres raros)
+function makeSafeId(str) {
+    return String(str).replace(/[^a-zA-Z0-9_-]/g, "_");
+}
+
+// Para el backend de Render, que puede entrar en "cold start" y tardar en responder
+function setBackendStatus(status, message = "") {
+    backendStatus = status;
+    const banner = document.getElementById("backend-status-banner");
+    if (!banner) return;
+
+    const configs = {
+        waking: {
+            html: `<i class="fa-solid fa-server fa-spin"></i>
+                   <span>El servidor está despertando… (hasta 60 s en la primera carga)</span>`,
+            cls: "bg-amber-100 dark:bg-amber-950/60 text-amber-900 dark:text-amber-200 border-amber-300 dark:border-amber-700",
+        },
+        ready: {
+            html: `<i class="fa-solid fa-circle-check"></i>
+                   <span>Servidor listo</span>`,
+            cls: "bg-emerald-100 dark:bg-emerald-950/60 text-emerald-900 dark:text-emerald-200 border-emerald-300 dark:border-emerald-700",
+        },
+        down: {
+            html: `<i class="fa-solid fa-triangle-exclamation"></i>
+                   <span>No se pudo contactar con el servidor. Revisa tu conexión.</span>`,
+            cls: "bg-rose-100 dark:bg-rose-950/60 text-rose-900 dark:text-rose-200 border-rose-300 dark:border-rose-700",
+        },
+    };
+
+    const cfg = configs[status];
+    if (!cfg) {
+        banner.classList.add("hidden");
+        return;
+    }
+    banner.className =
+        `fixed top-0 left-0 right-0 z-[9999] px-4 py-2 text-sm font-semibold border-b flex items-center justify-center gap-2 transition-all ${cfg.cls}`;
+    banner.innerHTML = cfg.html;
+    banner.classList.remove("hidden");
+
+    if (status === "ready") {
+        setTimeout(() => banner.classList.add("hidden"), 2000);
+    }
+}
+
+/**
+ * Hace un ping ligero al backend. Si responde, marca 'ready'.
+ * Si falla, marca 'waking' y reintenta hasta 90 s (cold start típico).
+ */
+async function wakeUpBackend(timeoutMs = 90000) {
+    if (backendStatus === "ready") return true;
+    if (warmupPromise) return warmupPromise;
+
+    warmupPromise = (async () => {
+        setBackendStatus("waking");
+
+        const started = Date.now();
+        // Reintentos progresivos mientras esté por debajo del timeout
+        while (Date.now() - started < timeoutMs) {
+            try {
+                const ctrl = new AbortController();
+                const t = setTimeout(() => ctrl.abort(), 15000);
+                const res = await apiFetch(`${API_BASE_URL}/`, {
+                    method: "GET",
+                    signal: ctrl.signal,
+                    cache: "no-store",
+                });
+                clearTimeout(t);
+                if (res.ok || res.status < 500) {
+                    setBackendStatus("ready");
+                    backendStatus = "ready";
+                    return true;
+                }
+            } catch (_) {
+                // aún no despierta: esperamos 3 s y reintentamos
+                await new Promise((r) => setTimeout(r, 3000));
+            }
+        }
+        setBackendStatus("down");
+        return false;
+    })();
+
+    try {
+        return await warmupPromise;
+    } finally {
+        warmupPromise = null;
+    }
+}
+
 // --- INICIALIZACIÓN ---
 document.addEventListener("DOMContentLoaded", async () => {
     initDarkMode();
     setupSpeechRecognition();
+    registerGlobalDelegatedListeners();
+
+    // 🔥 Despertamos el backend en paralelo mientras el usuario ve el login
+    wakeUpBackend().catch(() => {});
 
     // Verificación y restauración automática de sesión con Supabase
     await checkAutoLogin();
@@ -378,16 +492,10 @@ async function fetchProgressData() {
 async function fetchDailyChallenge() {
     try {
         const userLevel = userStats.level || "A1";
-
         const res = await fetch(
             `${API_BASE_URL}/api/daily-challenge?level=${userLevel}`,
-            {
-                headers: {
-                    Authorization: `Bearer ${authToken}`,
-                },
-            },
+            { headers: { Authorization: `Bearer ${authToken}` } },
         );
-
         if (!res.ok) return;
         const data = await res.json();
         const container = document.getElementById("challenge-missions");
@@ -396,41 +504,45 @@ async function fetchDailyChallenge() {
         container.innerHTML = data.missions
             .map((m) => {
                 const isCompleted = Boolean(m.completed);
+                const safeText = escapeHtml(m.text);
+                const safeLevel = escapeHtml(userLevel);
+                const safeId = Number(m.id);
 
                 return `
-            <div class="p-4 rounded-xl border transition-all duration-200 ${
-                isCompleted
-                    ? "bg-emerald-50/50 dark:bg-emerald-950/20 border-emerald-200 dark:border-emerald-800/50 opacity-80"
-                    : "bg-slate-50 dark:bg-slate-700/60 border-slate-200 dark:border-slate-600"
-            }">
-                <div class="flex items-center justify-between mb-2">
-                    <span class="text-sm font-bold ${
-                        isCompleted
-                            ? "text-emerald-700 dark:text-emerald-400"
-                            : "text-amber-700 dark:text-amber-400"
-                    }">
-                        Nivel ${userLevel} - Misión ${m.id}
-                    </span>
-                    <button 
-                        onclick="completeMission(${m.id}, this)" 
-                        ${isCompleted ? "disabled" : ""} 
-                        class="text-xs px-3 py-1 rounded-lg transition font-semibold flex items-center gap-1 ${
+                <div class="p-4 rounded-xl border transition-all duration-200 ${
+                    isCompleted
+                        ? "bg-emerald-50/50 dark:bg-emerald-950/20 border-emerald-200 dark:border-emerald-800/50 opacity-80"
+                        : "bg-slate-50 dark:bg-slate-700/60 border-slate-200 dark:border-slate-600"
+                }">
+                    <div class="flex items-center justify-between mb-2">
+                        <span class="text-sm font-bold ${
                             isCompleted
-                                ? "bg-slate-300 dark:bg-slate-700 text-slate-500 dark:text-slate-400 cursor-not-allowed"
-                                : "bg-amber-600 hover:bg-amber-700 text-white shadow-sm"
+                                ? "text-emerald-700 dark:text-emerald-400"
+                                : "text-amber-700 dark:text-amber-400"
                         }">
-                        ${
-                            isCompleted
-                                ? '<i class="fa-solid fa-check"></i> Completado'
-                                : "Completar"
-                        }
-                    </button>
-                </div>
-                <p class="text-slate-800 dark:text-slate-100 font-medium ${
-                    isCompleted ? "line-through text-slate-500 dark:text-slate-400" : ""
-                }">${m.text}</p>
-            </div>
-        `;
+                            Nivel ${safeLevel} - Misión ${safeId}
+                        </span>
+                        <button
+                            type="button"
+                            data-action="complete-mission"
+                            data-mission-id="${safeId}"
+                            ${isCompleted ? "disabled" : ""}
+                            class="text-xs px-3 py-1 rounded-lg transition font-semibold flex items-center gap-1 ${
+                                isCompleted
+                                    ? "bg-slate-300 dark:bg-slate-700 text-slate-500 dark:text-slate-400 cursor-not-allowed"
+                                    : "bg-amber-600 hover:bg-amber-700 text-white shadow-sm"
+                            }">
+                            ${
+                                isCompleted
+                                    ? '<span class="material-symbols-outlined text-[14px]">check</span> Completado'
+                                    : "Completar"
+                            }
+                        </button>
+                    </div>
+                    <p class="text-slate-800 dark:text-slate-100 font-medium ${
+                        isCompleted ? "line-through text-slate-500 dark:text-slate-400" : ""
+                    }">${safeText}</p>
+                </div>`;
             })
             .join("");
     } catch (e) {
@@ -444,29 +556,31 @@ async function completeMission(missionId, btnElement) {
 
     if (btnElement) {
         btnElement.disabled = true;
-        btnElement.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i>';
+        btnElement.innerHTML = '<span class="material-symbols-outlined text-[14px] animate-spin">progress_activity</span>';
     }
 
     try {
-        // POST con mission_id como query param en la URL
         const res = await conectarConServidorRender(
             `/api/daily-challenge/complete?mission_id=${missionId}`,
             "POST",
         );
-
         if (res.ok) {
             const data = await res.json();
 
-            // Cambiar visualmente el botón a completado e inhabilitarlo
             if (btnElement) {
                 btnElement.disabled = true;
-                btnElement.className = "text-xs px-3 py-1 rounded-lg font-semibold flex items-center gap-1 bg-slate-300 dark:bg-slate-700 text-slate-500 dark:text-slate-400 cursor-not-allowed";
-                btnElement.innerHTML = '<i class="fa-solid fa-check"></i> Completado';
-                
-                // Opcional: atenuar el contenedor padre
-                const card = btnElement.closest('div.p-4');
+                btnElement.className =
+                    "text-xs px-3 py-1 rounded-lg font-semibold flex items-center gap-1 bg-slate-300 dark:bg-slate-700 text-slate-500 dark:text-slate-400 cursor-not-allowed";
+                btnElement.innerHTML =
+                    '<span class="material-symbols-outlined text-[14px]">check</span> Completado';
+                const card = btnElement.closest("div.p-4");
                 if (card) {
-                    card.classList.add("bg-emerald-50/50", "dark:bg-emerald-950/20", "border-emerald-200", "opacity-80");
+                    card.classList.add(
+                        "bg-emerald-50/50",
+                        "dark:bg-emerald-950/20",
+                        "border-emerald-200",
+                        "opacity-80",
+                    );
                 }
             }
 
@@ -492,10 +606,7 @@ async function completeMission(missionId, btnElement) {
         });
     } finally {
         processing.mission = false;
-        if (btnElement) {
-            btnElement.disabled = false;
-            btnElement.innerHTML = "Completar";
-        }
+        // No re-habilitamos si ya estaba completada; el listener ya evita el doble click
     }
 }
 
@@ -554,26 +665,34 @@ function renderCurrentUnit() {
     if (!currentUnit) return;
     const display = document.getElementById("text-display");
     if (display) {
+        const vocabChips = currentUnit.vocabulary
+            .map((v) => {
+                const safe = escapeHtml(v);
+                return `
+                    <span class="bg-slate-100 dark:bg-slate-700 text-slate-800 dark:text-slate-200
+                                 px-2 py-0.5 rounded border border-slate-300 dark:border-slate-600
+                                 cursor-pointer hover:bg-indigo-600 hover:text-white
+                                 dark:hover:bg-indigo-600 dark:hover:text-white transition font-medium"
+                          data-action="play-audio"
+                          data-text="${safe}"
+                          title="Escuchar pronunciación">
+                        ${safe}
+                    </span>`;
+            })
+            .join("");
+
         display.innerHTML = `
             <div class="mb-3 flex flex-wrap gap-2 items-center">
                 <span class="text-xs bg-indigo-100 dark:bg-indigo-950/70 text-indigo-800 dark:text-indigo-200 px-2.5 py-1 rounded-md font-bold uppercase tracking-wide border border-indigo-200 dark:border-indigo-800/50">
-                    Gramática: ${currentUnit.grammar_focus}
+                    Gramática: ${escapeHtml(currentUnit.grammar_focus)}
                 </span>
             </div>
-            <p class="text-slate-800 dark:text-slate-100 text-lg leading-relaxed font-medium">${currentUnit.text}</p>
+            <p class="text-slate-800 dark:text-slate-100 text-lg leading-relaxed font-medium">
+                ${escapeHtml(currentUnit.text)}
+            </p>
             <div class="mt-4 pt-3 border-t border-slate-200 dark:border-slate-700 flex flex-wrap items-center gap-1.5 text-xs text-slate-600 dark:text-slate-300">
-                <strong class="text-slate-800 dark:text-slate-200">Vocabulario clave:</strong> 
-                ${currentUnit.vocabulary
-                    .map(
-                        (v) => `
-                    <span class="bg-slate-100 dark:bg-slate-700 text-slate-800 dark:text-slate-200 px-2 py-0.5 rounded border border-slate-300 dark:border-slate-600 cursor-pointer hover:bg-indigo-600 hover:text-white dark:hover:bg-indigo-600 dark:hover:text-white transition font-medium" 
-                          onclick="playNaturalAudio('${v}')" 
-                          title="Escuchar pronunciación">
-                        ${v}
-                    </span>
-                `,
-                    )
-                    .join("")}
+                <strong class="text-slate-800 dark:text-slate-200">Vocabulario clave:</strong>
+                ${vocabChips}
             </div>
         `;
     }
@@ -800,7 +919,7 @@ function stopRecording() {
 async function evaluatePronunciation(spokenText) {
     if (!currentUnit) return;
     try {
-        const response = await fetch(`${API_BASE_URL}/api/evaluate-reading`, {
+        const response = await apiFetch(`${API_BASE_URL}/api/evaluate-reading`, {
             method: "POST",
             headers: {
                 Authorization: `Bearer ${authToken}`,
@@ -829,21 +948,24 @@ function displayReadingResults(data) {
     if (!container || !scoreText || !annotatedText) return;
 
     container.classList.remove("hidden");
-    scoreText.innerText = `Precisión: ${data.accuracy_score}%`;
+    scoreText.innerText = `Precisión: ${Number(data.accuracy_score) || 0}%`;
 
     annotatedText.innerHTML = data.word_analysis
         .map((item) => {
+            const safeWord = escapeHtml(item.word);
             if (item.status === "correct") {
-                return `<span class="correct text-emerald-600 dark:text-emerald-400 font-bold mr-1.5">${item.word}</span>`;
-            } else {
-                return `
-                <span class="inline-flex flex-col items-center bg-rose-50 dark:bg-rose-950/50 px-2 py-1 rounded border border-rose-200 dark:border-rose-800/60 cursor-pointer mx-1 my-1 hover:bg-rose-100 dark:hover:bg-rose-900/60 transition" 
-                      onclick="playNaturalAudio('${item.word}')" 
-                      title="Escuchar pronunciación correcta">
-                    <span class="text-rose-700 dark:text-rose-300 font-bold underline decoration-rose-400">${item.word}</span>
-                    <span class="text-[11px] text-slate-600 dark:text-slate-400 font-mono font-medium">${item.ipa}</span>
-                </span>`;
+                return `<span class="correct text-emerald-600 dark:text-emerald-400 font-bold mr-1.5">${safeWord}</span>`;
             }
+            return `
+                <span class="inline-flex flex-col items-center bg-rose-50 dark:bg-rose-950/50
+                             px-2 py-1 rounded border border-rose-200 dark:border-rose-800/60
+                             cursor-pointer mx-1 my-1 hover:bg-rose-100 dark:hover:bg-rose-900/60 transition"
+                      data-action="play-audio"
+                      data-text="${safeWord}"
+                      title="Escuchar pronunciación correcta">
+                    <span class="text-rose-700 dark:text-rose-300 font-bold underline decoration-rose-400">${safeWord}</span>
+                    <span class="text-[11px] text-slate-600 dark:text-slate-400 font-mono font-medium">${escapeHtml(item.ipa)}</span>
+                </span>`;
         })
         .join(" ");
 }
@@ -950,7 +1072,7 @@ async function analyzeWriting(e) {
                 <i class="fa-solid fa-circle-notch fa-spin"></i> Analizando texto...
             </div>`;
 
-        const response = await fetch(`${API_BASE_URL}/api/check-writing`, {
+        const response = await apiFetch(`${API_BASE_URL}/api/check-writing`, {
             method: "POST",
             headers: {
                 Authorization: `Bearer ${authToken}`,
@@ -1105,57 +1227,78 @@ async function conectarConServidorRender(
     method = "GET",
     body = null,
     showLoading = false,
-) {
+    ) {
     if (!authToken) {
-        console.error(
-            "No se encontró token de autenticación, inicie sesión de nuevo.",
-        );
+        console.error("No hay token de autenticación.");
         showLoginModal();
         return { ok: false, status: 401 };
     }
 
-    if (showLoading) {
-        showLoadingAlert(
-            "Conectando con el servidor",
-            "Sincronizando datos...",
-        );
+    // Si sabemos que está dormido, avisamos al usuario primero
+    if (backendStatus !== "ready") {
+        await wakeUpBackend(); // muestra el banner "despertando…"
     }
 
+    let loadingTimer = null;
+    if (showLoading) {
+        showLoadingAlert("Conectando con el servidor", "Sincronizando datos…");
+    } else {
+        // Aviso diferido: si el fetch tarda > 2 s, mostramos toast
+        loadingTimer = setTimeout(() => {
+            Swal.fire({
+                toast: true,
+                position: "top-end",
+                icon: "info",
+                title: "El servidor está tardando…",
+                text: "Puede ser el arranque en frío de Render.",
+                showConfirmButton: false,
+                timer: 6000,
+                timerProgressBar: true,
+            });
+        }, 2000);
+    }
+
+    const controller = new AbortController();
+    // Cold start de Render free: hasta 90 s de margen
+    const timeoutId = setTimeout(() => controller.abort(), 90000);
+
     try {
-        const headers = {
-            Authorization: `Bearer ${authToken}`,
-        };
+        const headers = { Authorization: `Bearer ${authToken}` };
+        if (body && method !== "GET") headers["Content-Type"] = "application/json";
 
-        // Si se envía un cuerpo, añadimos el tipo de contenido
-        if (body && method !== "GET") {
-            headers["Content-Type"] = "application/json";
-        }
+        const config = { method, headers, signal: controller.signal };
+        if (body && method !== "GET") config.body = JSON.stringify(body);
 
-        const config = {
-            method: method,
-            headers: headers,
-        };
-
-        if (body && method !== "GET") {
-            config.body = JSON.stringify(body);
-        }
-
-        const response = await fetch(`${API_BASE_URL}${endpoint}`, config);
+        const response = await apiFetch(`${API_BASE_URL}${endpoint}`, config);
 
         if (response.status === 401) {
-            console.error("Sesión expirada o no autorizada (401).");
+            console.error("Sesión expirada (401).");
             handleLogout();
             return { ok: false, status: 401 };
         }
 
+        // Si el backend respondió, ya está despierto
+        if (backendStatus !== "ready") setBackendStatus("ready");
+
         return response;
     } catch (error) {
-        console.error("Error de conexión con la API:", error);
+        if (error.name === "AbortError") {
+            console.error("Timeout al conectar con el backend.");
+            Swal.fire({
+                icon: "warning",
+                title: "El servidor tardó demasiado",
+                text: "Render puede tardar hasta 60 s en despertar. Intenta de nuevo en un momento.",
+                confirmButtonColor: "#4f46e5",
+            });
+        } else {
+            console.error("Error de conexión con la API:", error);
+            setBackendStatus("down");
+        }
         return { ok: false, status: 500 };
     } finally {
-        if (showLoading) {
-            hideLoadingAlert();
-        }
+        clearTimeout(timeoutId);
+        if (loadingTimer) clearTimeout(loadingTimer);
+        if (showLoading) hideLoadingAlert();
     }
 }
 
@@ -1200,7 +1343,7 @@ async function submitSRSReview(success) {
     try {
         if (srsDueWords.length === 0 || !srsDueWords[currentSRSIndex]) return;
         const currentCard = srsDueWords[currentSRSIndex];
-        const res = await fetch(`${API_BASE_URL}/api/srs/review`, {
+        const res = await apiFetch(`${API_BASE_URL}/api/srs/review`, {
             method: "POST",
             headers: {
                 Authorization: `Bearer ${authToken}`,
@@ -1274,101 +1417,205 @@ function renderPhonemeCategory(containerId, items) {
         .map((item, index) => {
             const truncate = (str, max) =>
                 str.length > max ? str.slice(0, max) + "…" : str;
-            const shortHint = truncate(item.spanish_equivalent_or_hack, 300);
-            const shortError = truncate(item.common_error_spanish, 300);
 
-            const typeColor =
-                IPA_TYPE_COLORS[item.type] || IPA_TYPE_DEFAULT_COLOR;
-
-            // ID único combinando el contenedor y el índice de la tarjeta
-            const uniqueId = `${containerId}-${index}`;
+            const example     = escapeHtml(item.example);
+            const symbol      = escapeHtml(item.symbol);
+            const ipaEx       = escapeHtml(item.ipa_ex);
+            const type        = escapeHtml(item.type);
+            const shortHint   = escapeHtml(truncate(item.spanish_equivalent_or_hack, 300));
+            const shortError  = escapeHtml(truncate(item.common_error_spanish, 300));
+            const hintFull    = escapeHtml(item.spanish_equivalent_or_hack);
+            const errorFull   = escapeHtml(item.common_error_spanish);
+            const pairs       = escapeHtml(item.minimal_pairs.join(" · "));
+            const pairsFull   = escapeHtml(item.minimal_pairs.join("; "));
+            const spellings   = item.common_spellings.map(escapeHtml);
+            const typeColor   = IPA_TYPE_COLORS[item.type] || IPA_TYPE_DEFAULT_COLOR;
+            const cardId      = makeSafeId(`${containerId}-${index}`);
 
             return `
-      <div class="phoneme-card group bg-white dark:bg-slate-800 rounded-2xl shadow-sm hover:shadow-lg border border-slate-200 dark:border-slate-700 hover:border-cyan-400 dark:hover:border-cyan-500 transition-all duration-200 p-4 cursor-pointer"
-           data-index="${index}"
-           onclick="playNaturalAudio('${item.example}')">
-        
-        <div class="flex flex-col items-center text-center gap-1 p-2">
-            <span class="text-3xl font-mono font-bold text-cyan-700 dark:text-cyan-400 group-hover:scale-110 transition-transform origin-left">/${item.symbol}/</span>
-            <span class="text-base font-medium text-slate-700 dark:text-slate-200">${item.example}</span>
-            <span class="text-xs text-slate-400 dark:text-slate-500 font-mono">${item.ipa_ex}</span>
-        </div>
+            <div class="phoneme-card group bg-white dark:bg-slate-800 rounded-2xl shadow-sm hover:shadow-lg
+                        border border-slate-200 dark:border-slate-700 hover:border-cyan-400 dark:hover:border-cyan-500
+                        transition-all duration-200 p-4"
+                 data-card-id="${cardId}">
 
-        <div class="mt-1 text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider ">${item.type}</div>
+                <div class="flex flex-col items-center text-center gap-1 p-2">
+                    <span class="text-3xl font-mono font-bold text-cyan-700 dark:text-cyan-400">/${symbol}/</span>
+                    <span class="text-base font-medium text-slate-700 dark:text-slate-200">${example}</span>
+                    <span class="text-xs text-slate-400 dark:text-slate-500 font-mono">${ipaEx}</span>
+                    <button type="button"
+                            class="js-play-phoneme mt-1 text-cyan-600 dark:text-cyan-400 hover:scale-110 transition"
+                            data-example="${example}"
+                            aria-label="Reproducir pronunciación de ${example}">
+                        <span class="material-symbols-outlined">volume_up</span>
+                    </button>
+                </div>
 
-        <div class="mt-3 flex flex-wrap gap-1.5">
-          ${item.common_spellings
-              .map(
-                  (sp) =>
-                      `<span class="px-2.5 py-0.5 bg-cyan-100 dark:bg-cyan-900/40 text-cyan-800 dark:text-cyan-300 text-[11px] rounded-full font-mono border border-cyan-200 dark:border-cyan-800">${sp}</span>`,
-              )
-              .join("")}
-        </div>
+                <div class="mt-1 text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">${type}</div>
 
-        <div class="mt-3 text-xs text-slate-600 dark:text-slate-300">
-          <i class="fa-solid fa-arrows-rotate text-slate-500 dark:text-slate-400 text-xs mr-1"></i>
-          <span class="font-semibold">Contrasta con:</span>
-          <span class="ml-1">${item.minimal_pairs.join(" · ")}</span>
-        </div>
+                <div class="mt-3 flex flex-wrap gap-1.5">
+                    ${spellings.map((sp) =>
+                        `<span class="px-2.5 py-0.5 bg-cyan-100 dark:bg-cyan-900/40 text-cyan-800 dark:text-cyan-300 text-[11px] rounded-full font-mono border border-cyan-200 dark:border-cyan-800">${sp}</span>`
+                    ).join("")}
+                </div>
 
-        <div class="mt-2 text-xs text-slate-600 dark:text-slate-300 italic line-clamp-2">
-          <i class="fa-regular fa-lightbulb text-amber-400 dark:text-amber-300 text-xs mr-1.5"></i>
-          ${shortHint}
-        </div>
+                <div class="mt-3 text-xs text-slate-600 dark:text-slate-300">
+                    <span class="material-symbols-outlined text-slate-500 dark:text-slate-400 text-[14px] align-middle mr-1">swap_horiz</span>
+                    <span class="font-semibold">Contrasta con:</span>
+                    <span class="ml-1">${pairs}</span>
+                </div>
 
-        <div class="mt-1 text-[11px] text-rose-600 dark:text-rose-400 line-clamp-1">
-          <i class="fa-solid fa-triangle-exclamation text-rose-500 dark:text-rose-400 text-[10px] mr-1.5"></i>
-          ${shortError}
-        </div>
+                <div class="mt-2 text-xs text-slate-600 dark:text-slate-300 italic line-clamp-2">
+                    <span class="material-symbols-outlined text-amber-400 text-[14px] align-middle mr-1.5">lightbulb</span>
+                    ${shortHint}
+                </div>
 
-        <div class="mt-3 text-center">
-          <button onclick="event.stopPropagation(); toggleDetails(this, '${uniqueId}')" 
-                  class="text-[11px] font-medium text-cyan-600 dark:text-cyan-400 hover:underline focus:outline-none flex items-center justify-center gap-1.5 w-full">
-            <i class="fa-regular fa-book-open text-cyan-600 dark:text-cyan-400 text-xs"></i>
-            <span class="btn-toggle-text">Ver más</span>
-          </button>
-        </div>
+                <div class="mt-1 text-[11px] text-rose-600 dark:text-rose-400 line-clamp-1">
+                    <span class="material-symbols-outlined text-rose-500 text-[12px] align-middle mr-1.5">warning</span>
+                    ${shortError}
+                </div>
 
-        <div id="details-${uniqueId}" class="hidden mt-3 pt-3 border-t border-slate-200 dark:border-slate-700 text-xs text-slate-600 dark:text-slate-300 space-y-2">
-          <div>
-            <i class="fa-regular fa-lightbulb text-amber-400 dark:text-amber-300 text-xs mr-1.5"></i>
-            <span class="font-semibold">Similar a:</span> ${item.spanish_equivalent_or_hack}
-          </div>
-          <div>
-            <i class="fa-solid fa-xmark text-rose-500 dark:text-rose-400 text-xs w-4"></i>
-            <span class="font-semibold">Error común:</span> ${item.common_error_spanish}
-          </div>
-          <div>
-            <i class="fa-regular fa-pen-to-square text-slate-500 dark:text-slate-400 text-xs w-4"></i>
-            <span class="font-semibold">Grafías:</span> ${item.common_spellings.join(", ")}
-          </div>
-          <div>
-            <i class="fa-solid fa-rotate-right text-slate-500 dark:text-slate-400 text-xs w-4"></i>
-            <span class="font-semibold">Pares mínimos:</span> ${item.minimal_pairs.join("; ")}
-          </div>
-        </div>
-      </div>
-    `;
+                <div class="mt-3 text-center">
+                    <button type="button"
+                            data-action="toggle-details"
+                            class="text-[11px] font-medium text-cyan-600 dark:text-cyan-400 hover:underline flex items-center justify-center gap-1.5 w-full">
+                        <span class="material-symbols-outlined text-[14px]">menu_book</span>
+                        <span class="btn-toggle-text">Ver más</span>
+                    </button>
+                </div>
+
+                <div data-details-panel
+                     id="details-${cardId}"
+                     class="hidden mt-3 pt-3 border-t border-slate-200 dark:border-slate-700 text-xs text-slate-600 dark:text-slate-300 space-y-2">
+                    <div>
+                        <span class="material-symbols-outlined text-amber-400 text-[14px] align-middle mr-1.5">lightbulb</span>
+                        <span class="font-semibold">Similar a:</span> ${hintFull}
+                    </div>
+                    <div>
+                        <span class="material-symbols-outlined text-rose-500 text-[14px] align-middle mr-1.5">close</span>
+                        <span class="font-semibold">Error común:</span> ${errorFull}
+                    </div>
+                    <div>
+                        <span class="material-symbols-outlined text-slate-500 text-[14px] align-middle mr-1.5">edit_note</span>
+                        <span class="font-semibold">Grafías:</span> ${spellings.join(", ")}
+                    </div>
+                    <div>
+                        <span class="material-symbols-outlined text-slate-500 text-[14px] align-middle mr-1.5">sync</span>
+                        <span class="font-semibold">Pares mínimos:</span> ${pairsFull}
+                    </div>
+                </div>
+            </div>`;
         })
         .join("");
+}
 
-    window.toggleDetails = function (btn, uniqueId) {
-        const details = document.getElementById(`details-${uniqueId}`);
-        if (details) {
-            const isHidden = details.classList.contains("hidden");
-            details.classList.toggle("hidden");
-            const textSpan = btn.querySelector(".btn-toggle-text");
-            const icon = btn.querySelector("i");
-            if (textSpan) {
-                textSpan.textContent = isHidden ? "Ver menos" : "Ver más";
-            }
-            if (icon) {
-                icon.className = isHidden
-                    ? "fa-regular fa-book text-cyan-600 dark:text-cyan-400 text-xs"
-                    : "fa-regular fa-book-open text-cyan-600 dark:text-cyan-400 text-xs";
-            }
+function toggleDetails(btn) {
+    const card = btn.closest(".phoneme-card");
+    if (!card) return;
+    const details = card.querySelector("[data-details-panel]");
+    if (!details) return;
+
+    const isHidden = details.classList.contains("hidden");
+    details.classList.toggle("hidden");
+
+    const textSpan = btn.querySelector(".btn-toggle-text");
+    const icon = btn.querySelector(".material-symbols-outlined");
+    if (textSpan) textSpan.textContent = isHidden ? "Ver menos" : "Ver más";
+    if (icon) icon.textContent = isHidden ? "menu_book" : "auto_stories";
+}
+
+function registerGlobalDelegatedListeners() {
+    document.addEventListener("click", (e) => {
+
+        // ─── 1. Reproducir audio de vocabulario / fonema / palabra ───
+        const audioTrigger = e.target.closest("[data-action='play-audio']");
+        if (audioTrigger) {
+            e.preventDefault();
+            e.stopPropagation();
+            const text = audioTrigger.dataset.text;
+            if (text) playNaturalAudio(text);
+            return;
         }
-    };
+
+        // ─── 2. Reproducir audio de un botón concreto (icono volumen) ───
+        const playBtn = e.target.closest(".js-play-phoneme");
+        if (playBtn) {
+            e.preventDefault();
+            e.stopPropagation();
+            const text = playBtn.dataset.example;
+            if (text) playNaturalAudio(text);
+            return;
+        }
+
+        // ─── 3. Toggle "Ver más" en tarjetas de fonemas ───
+        const toggleBtn = e.target.closest("[data-action='toggle-details']");
+        if (toggleBtn) {
+            e.preventDefault();
+            e.stopPropagation();
+            toggleDetails(toggleBtn);
+            return;
+        }
+
+        // ─── 4. Seleccionar unidad del currículo ───
+        const unitCard = e.target.closest("[data-action='load-unit']");
+        if (unitCard) {
+            e.preventDefault();
+            e.stopPropagation();
+            const unitId = unitCard.dataset.unitId;
+            const unlocked = unitCard.dataset.unlocked === "true";
+            const levelKey = unitCard.dataset.level;
+            if (unlocked) {
+                loadUnitPractice(unitId);
+            } else {
+                Swal.fire({
+                    icon: "warning",
+                    title: "Unidad bloqueada",
+                    text: `Debes alcanzar el nivel ${levelKey} en el Test de Nivel para desbloquear esta unidad.`,
+                    confirmButtonColor: "#4f46e5",
+                });
+            }
+            return;
+        }
+
+        // ─── 5. Completar misión diaria ───
+        const missionBtn = e.target.closest("[data-action='complete-mission']");
+        if (missionBtn && !missionBtn.disabled) {
+            e.preventDefault();
+            e.stopPropagation();
+            const missionId = Number(missionBtn.dataset.missionId);
+            completeMission(missionId, missionBtn);
+            return;
+        }
+
+        // ─── 6. Iniciar escenario roleplay ───
+        const scenarioCard = e.target.closest("[data-action='start-roleplay']");
+        if (scenarioCard) {
+            e.preventDefault();
+            e.stopPropagation();
+            startRoleplaySession(scenarioCard.dataset.scenarioId);
+            return;
+        }
+
+        // ─── 7. Usar sugerencia de roleplay ───
+        const suggestionBtn = e.target.closest("[data-action='use-suggestion']");
+        if (suggestionBtn) {
+            e.preventDefault();
+            e.stopPropagation();
+            const reply = suggestionBtn.dataset.reply;
+            const input = document.getElementById("rp-transcript-input");
+            if (input) input.value = reply;
+            sendRoleplayMessage(e);
+            return;
+        }
+
+        // ─── 8. Seleccionar opción del placement test ───
+        const ptOpt = e.target.closest("[data-action='pt-select-option']");
+        if (ptOpt) {
+            e.preventDefault();
+            e.stopPropagation();
+            selectPlacementOption(Number(ptOpt.dataset.optionIndex));
+            return;
+        }
+    });
 }
 
 // --- ROLEPLAY MODULO ---
@@ -1395,23 +1642,32 @@ function renderScenariosGrid(scenarios) {
     if (!grid) return;
 
     grid.innerHTML = scenarios
-        .map(
-            (sc) => `
-        <div onclick="startRoleplaySession('${sc.id}')" 
-             class="p-5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl hover:border-indigo-500 dark:hover:border-indigo-400 hover:shadow-md cursor-pointer transition flex flex-col justify-between">
-            <div>
-                <div class="w-12 h-12 bg-indigo-50 dark:bg-indigo-950/70 text-indigo-600 dark:text-indigo-400 rounded-xl flex items-center justify-center text-2xl mb-4">
-                    <i class="fa-solid ${sc.icon}"></i>
+        .map((sc) => {
+            const safeId = escapeAttr(sc.id);
+            const safeTitle = escapeHtml(sc.title);
+            const safeDesc = escapeHtml(sc.description);
+            const safeIcon = escapeAttr(sc.icon);
+
+            return `
+            <div data-action="start-roleplay"
+                 data-scenario-id="${safeId}"
+                 class="p-5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700
+                        rounded-xl hover:border-indigo-500 dark:hover:border-indigo-400
+                        hover:shadow-md cursor-pointer transition flex flex-col justify-between">
+                <div>
+                    <div class="w-12 h-12 bg-indigo-50 dark:bg-indigo-950/70 text-indigo-600 dark:text-indigo-400
+                                rounded-xl flex items-center justify-center text-2xl mb-4">
+                        <i class="${safeIcon}"></i>
+                    </div>
+                    <h3 class="font-bold text-slate-800 dark:text-slate-100 text-lg mb-1">${safeTitle}</h3>
+                    <p class="text-xs text-slate-600 dark:text-slate-300 mb-3">${safeDesc}</p>
                 </div>
-                <h3 class="font-bold text-slate-800 dark:text-slate-100 text-lg mb-1">${sc.title}</h3>
-                <p class="text-xs text-slate-600 dark:text-slate-300 mb-3">${sc.description}</p>
-            </div>
-            <span class="text-xs font-semibold text-indigo-600 dark:text-indigo-400 flex items-center gap-1">
-                Iniciar práctica <i class="fa-solid fa-arrow-right"></i>
-            </span>
-        </div>
-    `,
-        )
+                <span class="text-xs font-semibold text-indigo-600 dark:text-indigo-400 flex items-center gap-1">
+                    Iniciar práctica
+                    <span class="material-symbols-outlined text-[14px]">arrow_forward</span>
+                </span>
+            </div>`;
+        })
         .join("");
 }
 
@@ -1449,14 +1705,26 @@ function appendRPMessage(sender, text, feedback = null) {
     if (!container) return;
 
     const isBot = sender === "bot";
+    const safeText = escapeHtml(text);
+    const safeFeedback = feedback ? escapeHtml(feedback) : null;
+
     const msgHtml = `
         <div class="flex flex-col ${isBot ? "items-start" : "items-end"}">
-            <div class="max-w-[80%] p-4 rounded-2xl ${isBot ? "bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-100" : "bg-indigo-600 text-white"} shadow-sm">
-                <p class="text-sm font-medium">${text}</p>
+            <div class="max-w-[80%] p-4 rounded-2xl ${
+                isBot
+                    ? "bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-100"
+                    : "bg-indigo-600 text-white"
+            } shadow-sm">
+                <p class="text-sm font-medium">${safeText}</p>
             </div>
-            ${feedback ? `<span class="text-[11px] text-amber-700 dark:text-amber-400 mt-1 font-semibold flex items-center gap-1"><i class="fa-solid fa-lightbulb"></i> ${feedback}</span>` : ""}
-        </div>
-    `;
+            ${
+                safeFeedback
+                    ? `<span class="text-[11px] text-amber-700 dark:text-amber-400 mt-1 font-semibold flex items-center gap-1">
+                           <span class="material-symbols-outlined text-[12px]">lightbulb</span> ${safeFeedback}
+                       </span>`
+                    : ""
+            }
+        </div>`;
 
     container.insertAdjacentHTML("beforeend", msgHtml);
     container.scrollTop = container.scrollHeight;
@@ -1474,22 +1742,25 @@ function renderRPSuggestions(replies) {
 
     box.classList.remove("hidden");
     box.innerHTML = replies
-        .map(
-            (r) => `
-        <button 
-            type="button" 
-            data-reply="${encodeURIComponent(r)}"
-            onclick="useRPSuggestionFromData(this, event)" 
-            class="bg-slate-100 dark:bg-slate-700 hover:bg-indigo-50 dark:hover:bg-indigo-950/60 hover:text-indigo-700 dark:hover:text-indigo-300 text-slate-700 dark:text-slate-200 px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-600 transition font-medium text-left"
-        >
-            💡 "${r}"
-        </button>
-    `,
-        )
+        .map((r) => {
+            const safeReply = escapeAttr(r);
+            const visible = escapeHtml(r);
+            return `
+            <button type="button"
+                    data-action="use-suggestion"
+                    data-reply="${safeReply}"
+                    class="bg-slate-100 dark:bg-slate-700 hover:bg-indigo-50 dark:hover:bg-indigo-950/60
+                           hover:text-indigo-700 dark:hover:text-indigo-300
+                           text-slate-700 dark:text-slate-200 px-3 py-1.5 rounded-lg
+                           border border-slate-200 dark:border-slate-600 transition font-medium text-left">
+                <span class="material-symbols-outlined text-[14px] align-middle mr-1">lightbulb</span>
+                "${visible}"
+            </button>`;
+        })
         .join("");
 }
 
-function useRPSuggestionFromData(btnEl, e) {
+/*function useRPSuggestionFromData(btnEl, e) {
     if (e) {
         e.preventDefault();
         e.stopPropagation();
@@ -1502,7 +1773,7 @@ function useRPSuggestionFromData(btnEl, e) {
         input.value = text;
     }
     sendRoleplayMessage(e);
-}
+}*/
 
 function toggleRoleplayMic() {
     const btn = document.getElementById("rp-mic-btn");
@@ -1583,7 +1854,7 @@ async function sendRoleplayMessage(e) {
         roleplayHistory.push({ role: "user", content: userText });
         input.value = "";
 
-        const res = await fetch(`${API_BASE_URL}/api/roleplay/respond`, {
+        const res = await apiFetch(`${API_BASE_URL}/api/roleplay/respond`, {
             method: "POST",
             headers: {
                 Authorization: `Bearer ${authToken}`,
@@ -1632,7 +1903,7 @@ async function sendRoleplayMessage(e) {
     }
 }
 
-function selectSuggestedResponse(text, e) {
+/*function selectSuggestedResponse(text, e) {
     if (e) {
         e.preventDefault();
         e.stopPropagation();
@@ -1642,7 +1913,7 @@ function selectSuggestedResponse(text, e) {
         input.value = text;
     }
     sendRoleplayMessage(e);
-}
+}*/
 
 function renderRoleplaySuggestions(suggestions) {
     const container = document.getElementById("rp-suggestions-container");
@@ -1706,25 +1977,27 @@ function renderPlacementQuestion(data) {
     ptState.selectedOption = null;
 
     document.getElementById("pt-step-indicator").innerText =
-        `Pregunta ${data.step} de ${data.total_steps}`;
+        `Pregunta ${Number(data.step)} de ${Number(data.total_steps)}`;
     document.getElementById("pt-difficulty-indicator").innerText =
-        `Dificultad: ${data.level}`;
+        `Dificultad: ${escapeHtml(data.level)}`;
     document.getElementById("pt-progress-bar").style.width =
         `${(data.step / data.total_steps) * 100}%`;
-    document.getElementById("pt-question-text").innerText =
-        data.question.question;
+    document.getElementById("pt-question-text").innerText = data.question.question;
 
     const optionsContainer = document.getElementById("pt-options-container");
     optionsContainer.innerHTML = data.question.options
-        .map(
-            (opt, idx) => `
-        <button onclick="selectPlacementOption(${idx})" 
-                id="pt-opt-${idx}"
-                class="pt-option-btn w-full text-left p-4 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-amber-50 dark:hover:bg-amber-950/30 hover:border-amber-300 dark:hover:border-amber-600 font-medium text-sm text-slate-800 dark:text-slate-100 transition">
-            <span class="font-bold text-amber-600 dark:text-amber-400 mr-2">${String.fromCharCode(65 + idx)}.</span> ${opt}
-        </button>
-    `,
-        )
+        .map((opt, idx) => `
+            <button type="button"
+                    data-action="pt-select-option"
+                    data-option-index="${idx}"
+                    class="pt-option-btn w-full text-left p-4 rounded-xl border border-slate-200 dark:border-slate-700
+                           bg-white dark:bg-slate-800 hover:bg-amber-50 dark:hover:bg-amber-950/30
+                           hover:border-amber-300 dark:hover:border-amber-600 font-medium text-sm
+                           text-slate-800 dark:text-slate-100 transition">
+                <span class="font-bold text-amber-600 dark:text-amber-400 mr-2">${String.fromCharCode(65 + idx)}.</span>
+                ${escapeHtml(opt)}
+            </button>
+        `)
         .join("");
 
     const nextBtn = document.getElementById("pt-next-btn");
@@ -1762,7 +2035,7 @@ async function submitPlacementAnswer() {
     btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Enviando...';
 
     try {
-        const res = await fetch(`${API_BASE_URL}/api/placement/next`, {
+        const res = await apiFetch(`${API_BASE_URL}/api/placement/next`, {
             method: "POST",
             headers: {
                 Authorization: `Bearer ${authToken}`,
@@ -1853,54 +2126,73 @@ async function renderCurriculum() {
             .map((levelKey) => {
                 const levelData = curriculum[levelKey];
                 const unlocked = isLevelUnlocked(levelKey);
+                const safeLevel = escapeAttr(levelKey);
+                const safeLevelName = escapeHtml(levelData.level_name);
 
                 return `
-                <div class="mb-8 p-6 bg-slate-50 dark:bg-slate-800/40 border ${unlocked ? "border-slate-200 dark:border-slate-700" : "border-slate-200 dark:border-slate-800 bg-slate-100/60 dark:bg-slate-900/60"} rounded-2xl transition">
+                <div class="mb-8 p-6 bg-slate-50 dark:bg-slate-800/40 border ${
+                    unlocked
+                        ? "border-slate-200 dark:border-slate-700"
+                        : "border-slate-200 dark:border-slate-800 bg-slate-100/60 dark:bg-slate-900/60"
+                } rounded-2xl transition">
                     <div class="flex justify-between items-center mb-4">
                         <div class="flex items-center gap-3">
-                            <span class="px-3 py-1 text-xs font-black rounded-lg ${unlocked ? "bg-indigo-600 text-white" : "bg-slate-300 dark:bg-slate-700 text-slate-600 dark:text-slate-400"}">
-                                ${levelKey}
-                            </span>
-                            <h3 class="text-lg font-bold ${unlocked ? "text-slate-800 dark:text-slate-100" : "text-slate-400 dark:text-slate-500"}">
-                                ${levelData.level_name}
-                            </h3>
+                            <span class="px-3 py-1 text-xs font-black rounded-lg ${
+                                unlocked
+                                    ? "bg-indigo-600 text-white"
+                                    : "bg-slate-300 dark:bg-slate-700 text-slate-600 dark:text-slate-400"
+                            }">${safeLevel}</span>
+                            <h3 class="text-lg font-bold ${
+                                unlocked
+                                    ? "text-slate-800 dark:text-slate-100"
+                                    : "text-slate-400 dark:text-slate-500"
+                            }">${safeLevelName}</h3>
                         </div>
-
                         ${
                             unlocked
-                                ? `
-                            <span class="text-xs font-bold text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/50 px-3 py-1 rounded-full border border-emerald-200 dark:border-emerald-800/60 flex items-center gap-1">
-                                <i class="fa-solid fa-unlock"></i> Desbloqueado
-                            </span>
-                        `
-                                : `
-                            <span class="text-xs font-bold text-slate-500 dark:text-slate-400 bg-slate-200 dark:bg-slate-700 px-3 py-1 rounded-full flex items-center gap-1">
-                                <i class="fa-solid fa-lock"></i> Requiere Nivel ${levelKey}
-                            </span>
-                        `
+                                ? `<span class="text-xs font-bold text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/50 px-3 py-1 rounded-full border border-emerald-200 dark:border-emerald-800/60 flex items-center gap-1">
+                                       <span class="material-symbols-outlined text-[14px]">lock_open</span> Desbloqueado
+                                   </span>`
+                                : `<span class="text-xs font-bold text-slate-500 dark:text-slate-400 bg-slate-200 dark:bg-slate-700 px-3 py-1 rounded-full flex items-center gap-1">
+                                       <span class="material-symbols-outlined text-[14px]">lock</span> Requiere Nivel ${safeLevel}
+                                   </span>`
                         }
                     </div>
-
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                         ${levelData.units
-                            .map(
-                                (unit) => `
-                            <div class="p-5 bg-white dark:bg-slate-800 border ${unlocked ? "border-slate-200 dark:border-slate-700 hover:border-indigo-500 dark:hover:border-indigo-400 cursor-pointer shadow-sm" : "border-slate-200 dark:border-slate-700 opacity-60 cursor-not-allowed"} rounded-xl transition flex justify-between items-center"
-                                 onclick="${unlocked ? `loadUnitPractice('${unit.id}')` : `Swal.fire({icon:'warning',title:'Unidad bloqueada',text:'Debes alcanzar el nivel ${levelKey} en el Test de Nivel para desbloquear esta unidad.',confirmButtonColor:'#4f46e5'})`}">
-                                <div>
-                                    <h4 class="font-bold text-sm text-slate-800 dark:text-slate-100">${unit.title}</h4>
-                                    <p class="text-xs text-slate-600 dark:text-slate-400 mt-1"><i class="fa-solid fa-book-bookmark text-indigo-500"></i> ${unit.grammar_focus}</p>
-                                </div>
-                                <div class="text-indigo-600 dark:text-indigo-400 font-bold text-sm">
-                                    ${unlocked ? '<i class="fa-solid fa-chevron-right"></i>' : '<i class="fa-solid fa-lock text-slate-400 dark:text-slate-500"></i>'}
-                                </div>
-                            </div>
-                        `,
-                            )
+                            .map((unit) => {
+                                const safeUnitId = escapeAttr(unit.id);
+                                const safeTitle = escapeHtml(unit.title);
+                                const safeGrammar = escapeHtml(unit.grammar_focus);
+                                return `
+                                <div data-action="load-unit"
+                                     data-unit-id="${safeUnitId}"
+                                     data-level="${safeLevel}"
+                                     data-unlocked="${unlocked}"
+                                     class="p-5 bg-white dark:bg-slate-800 border ${
+                                         unlocked
+                                             ? "border-slate-200 dark:border-slate-700 hover:border-indigo-500 dark:hover:border-indigo-400 cursor-pointer shadow-sm"
+                                             : "border-slate-200 dark:border-slate-700 opacity-60 cursor-not-allowed"
+                                     } rounded-xl transition flex justify-between items-center">
+                                    <div>
+                                        <h4 class="font-bold text-sm text-slate-800 dark:text-slate-100">${safeTitle}</h4>
+                                        <p class="text-xs text-slate-600 dark:text-slate-400 mt-1">
+                                            <span class="material-symbols-outlined text-indigo-500 text-[14px] align-middle mr-1">bookmark</span>
+                                            ${safeGrammar}
+                                        </p>
+                                    </div>
+                                    <div class="text-indigo-600 dark:text-indigo-400 font-bold text-sm">
+                                        ${
+                                            unlocked
+                                                ? '<span class="material-symbols-outlined">chevron_right</span>'
+                                                : '<span class="material-symbols-outlined text-slate-400 dark:text-slate-500">lock</span>'
+                                        }
+                                    </div>
+                                </div>`;
+                            })
                             .join("")}
                     </div>
-                </div>
-            `;
+                </div>`;
             })
             .join("");
     } catch (err) {
@@ -2092,7 +2384,7 @@ function updateNavUserProfile(username, level = "A1") {
 function showLoadingAlert(
     title = "Procesando...",
     text = "Por favor espera mientras el servidor responde.",
-) {
+    ) {
     Swal.fire({
         title: title,
         text: text,
@@ -2109,3 +2401,24 @@ function showLoadingAlert(
 function hideLoadingAlert() {
     Swal.close();
 }
+
+// Helper específico que reutiliza el warmup
+async function apiFetch(path, options = {}) {
+    if (backendStatus !== "ready") await wakeUpBackend();
+
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 90000);
+
+    try {
+        const res = await fetch(`${API_BASE_URL}${path}`, {
+            ...options,
+            signal: controller.signal,
+        });
+        if (res.status === 401) { handleLogout(); }
+        if (backendStatus !== "ready") setBackendStatus("ready");
+        return res;
+    } finally {
+        clearTimeout(timeoutId);
+    }
+}
+
