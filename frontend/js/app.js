@@ -1132,33 +1132,39 @@ async function analyzeWriting(e) {
     if (processing.writing) return;
     processing.writing = true;
 
+    const btn = document.getElementById("btn-analyze-writing");
+    const input = document.getElementById("writing-input");
+    const resDiv = document.getElementById("writing-results");
+
+    // ── Validaciones ANTES de mostrar el loading ──
+    if (!btn || !input || !resDiv) {
+        processing.writing = false;
+        return;
+    }
+
+    const text = input.value.trim();
+    if (!text) {
+        processing.writing = false;
+        await Swal.fire({
+            icon: "warning",
+            title: "Texto vacío",
+            text: "Escribe o pega un texto en inglés.",
+            confirmButtonColor: "#4f46e5",
+        });
+        return;
+    }
+
+    // ── A partir de aquí, mostramos el loading y bloqueamos el botón ──
     showLoadingAlert(
         "Analizando gramática",
         "Enviando tu texto al servidor...",
     );
 
-    const btn = document.getElementById("btn-analyze-writing");
     btn.disabled = true;
     btn.classList.add("opacity-50", "cursor-not-allowed");
     btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Analizando...';
 
-    try {
-        const input = document.getElementById("writing-input");
-        const resDiv = document.getElementById("writing-results");
-        if (!input || !resDiv) return;
-
-        const text = input.value.trim();
-        if (!text) {
-            hideLoadingAlert();
-            await Swal.fire({
-                icon: "warning",
-                title: "Texto vacío",
-                text: "Escribe o pega un texto en inglés.",
-                confirmButtonColor: "#4f46e5",
-            });
-            return;
-        }
-
+     try {
         resDiv.classList.remove("hidden");
         resDiv.innerHTML = `
             <div class="p-4 bg-indigo-50 dark:bg-indigo-950/40 text-indigo-800 dark:text-indigo-200 rounded-xl font-medium animate-pulse flex items-center gap-2">
@@ -1194,7 +1200,7 @@ async function analyzeWriting(e) {
             data.feedback.forEach((item) => {
                 html += `
                     <li class="p-4 bg-rose-50 dark:bg-rose-950/40 border-l-4 border-rose-500 text-sm rounded-r-xl shadow-sm">
-                        <strong class="text-rose-800 dark:text-rose-300 font-bold">${item.short_message}:</strong> 
+                        <strong class="text-rose-800 dark:text-rose-300 font-bold">${item.short_message}:</strong>
                         <span class="text-slate-800 dark:text-slate-200">${item.message}</span>
                     </li>`;
             });
@@ -1204,15 +1210,11 @@ async function analyzeWriting(e) {
         resDiv.innerHTML = html;
     } catch (err) {
         console.error("Writing Error:", err);
-        const resDiv = document.getElementById("writing-results");
-        if (resDiv) {
-            resDiv.innerHTML = `
-                <div class="p-4 bg-rose-50 dark:bg-rose-950/50 text-rose-800 dark:text-rose-200 border border-rose-200 dark:border-rose-800 rounded-xl font-medium">
-                    ⚠️ Ocurrió un error al conectar con el servidor.
-                </div>`;
-        }
-        hideLoadingAlert();
-        Swal.fire({
+        resDiv.innerHTML = `
+            <div class="p-4 bg-rose-50 dark:bg-rose-950/50 text-rose-800 dark:text-rose-200 border border-rose-200 dark:border-rose-800 rounded-xl font-medium">
+                ⚠️ Ocurrió un error al conectar con el servidor.
+            </div>`;
+        await Swal.fire({
             icon: "error",
             title: "Error",
             text: "No se pudo analizar el texto.",
@@ -1222,6 +1224,7 @@ async function analyzeWriting(e) {
         btn.disabled = false;
         btn.classList.remove("opacity-50", "cursor-not-allowed");
         btn.innerHTML = "Analizar Gramática";
+        hideLoadingAlert();   // ← ahora sí: único punto de cierre del loading
     }
 }
 
