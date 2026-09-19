@@ -1,3 +1,14 @@
+# Evitar los warnings
+import warnings
+
+# Silencia los warnings de "Field name X shadows an attribute in parent Operation"
+# que emite el SDK google-genai al importarse (bug conocido del SDK, no nuestro).
+warnings.filterwarnings(
+    "ignore",
+    message=r'Field name ".*" shadows an attribute in parent "Operation"',
+    category=UserWarning,
+)
+
 import difflib
 import io
 import json
@@ -40,7 +51,6 @@ from starlette.middleware.base import BaseHTTPMiddleware
 from uvicorn.protocols.utils import ClientDisconnected
 from supabase import create_client, Client
 
-
 load_dotenv()
 
 logging.basicConfig(level=logging.INFO)
@@ -52,6 +62,7 @@ app = FastAPI(title="LinguaBoost Pro API", version="5.0.0")
 ALLOWED_ORIGINS = [
     o.strip() for o in os.getenv("ALLOWED_ORIGINS", "").split(",") if o.strip()
 ]
+
 if not ALLOWED_ORIGINS:
     logger.warning(
         "ALLOWED_ORIGINS no configurado: no se permitirá ningún origen por CORS."
@@ -101,7 +112,6 @@ else:
     logger.warning(
         "GEMINI_API_KEY no configurada: el Roleplay usará respuestas de respaldo."
     )
-
 
 # --- CARGA DE CONTENIDO DESDE ARCHIVOS JSON ---
 # Usamos un solo .parent para quedarnos en la carpeta actual ('backend' o 'src')
@@ -178,17 +188,14 @@ class PronunciationEvaluationRequest(BaseModel):
     target_text: str
     spoken_text: str
 
-
 class SRSReviewRequest(BaseModel):
     word: str
     success: bool
-
 
 class RoleplayMessageRequest(BaseModel):
     scenario_id: str
     user_message: str
     conversation_history: List[dict] = []
-
 
 class PlacementStepRequest(BaseModel):
     current_level: str
@@ -199,11 +206,8 @@ class PlacementStepRequest(BaseModel):
 
 class WritingCheckRequest(BaseModel):
     text: str
-
-
 class CompleteChallengeRequest(BaseModel):
     mission_id: int = 1
-
 
 # --- MIDDLEWARE ---
 class SuppressDisconnectMiddleware(BaseHTTPMiddleware):
@@ -775,7 +779,6 @@ def get_srs_stats(authorization: Optional[str] = Header(None)):
 def get_roleplay_scenarios():
     return ROLEPLAY_SCENARIOS
 
-
 @app.post("/api/roleplay/respond")
 async def roleplay_respond(data: RoleplayMessageRequest, request: Request):
     if await request.is_disconnected():
@@ -796,7 +799,7 @@ async def roleplay_respond(data: RoleplayMessageRequest, request: Request):
         f"Escenario: {scenario['title']}. Tu rol: {scenario['role']}."
     )
 
-    # 1. Construir el historial compatible con el nuevo SDK
+    # Construir el historial compatible con el nuevo SDK
     formatted_contents = []
     for msg in data.conversation_history:
         role = "model" if msg.get("role") == "assistant" else "user"
@@ -809,7 +812,7 @@ async def roleplay_respond(data: RoleplayMessageRequest, request: Request):
                 )
             )
 
-    # 2. Asegurar que el mensaje actual del usuario esté al final
+    # Asegurar que el mensaje actual del usuario esté al final
     if not formatted_contents or formatted_contents[-1].parts[0].text != data.user_message:
         formatted_contents.append(
             types.Content(
@@ -819,7 +822,7 @@ async def roleplay_respond(data: RoleplayMessageRequest, request: Request):
         )
 
     try:
-        # 3. Llamada directa con el cliente moderno de Google GenAI
+        # Llamada directa con el cliente moderno de Google GenAI
         response = clientGemini.models.generate_content(
             model=GEMINI_MODEL_NAME,
             contents=formatted_contents,

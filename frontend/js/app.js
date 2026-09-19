@@ -306,6 +306,16 @@ document.addEventListener("DOMContentLoaded", async () => {
             }
         });
     }
+
+    // Logo → volver al inicio
+    const logoHome = document.getElementById("logo-home");
+    if (logoHome) {
+        logoHome.addEventListener("click", () => {
+            switchTab("home");
+            // Si el menú desplegable está abierto, ciérralo
+            document.getElementById("main-menu")?.classList.add("hidden");
+        });
+    }
 });
 
 async function checkAutoLogin() {
@@ -2308,16 +2318,26 @@ function loadUnitPractice(unitId) {
 
 // --- GESTIÓN DE PESTAÑAS (TABS) ---
 function switchTab(tabName) {
+    const dashboard = document.getElementById("dashboard-section");
+    const isHome = !tabName || tabName === "home";
+
     // Ocultar todas las secciones
     document
         .querySelectorAll(".tab-content")
         .forEach((el) => el.classList.add("hidden"));
 
-    // Mostrar la sección activa
-    const activeSection = document.getElementById(`sec-${tabName}`);
-    if (activeSection) activeSection.classList.remove("hidden");
+    // Mostrar la sección activa (salvo en "home", que solo muestra el dashboard)
+    if (!isHome) {
+        const activeSection = document.getElementById(`sec-${tabName}`);
+        if (activeSection) activeSection.classList.remove("hidden");
+    }
 
-    // Resaltar el ítem en el menú
+    // Mostrar dashboard solo cuando estamos en "home"
+    if (dashboard) {
+        dashboard.classList.toggle("hidden", !isHome);
+    }
+
+    // Resaltar el ítem del menú
     document.querySelectorAll("#main-menu a[data-tab]").forEach((link) => {
         link.classList.remove(
             "bg-indigo-50",
@@ -2325,7 +2345,7 @@ function switchTab(tabName) {
             "border-l-4",
             "border-indigo-500",
         );
-        if (link.dataset.tab === tabName) {
+        if (link.dataset.tab === (tabName || "home")) {
             link.classList.add(
                 "bg-indigo-50",
                 "dark:bg-indigo-950/50",
@@ -2356,7 +2376,16 @@ function switchTab(tabName) {
         case "reading":
             renderCurriculum();
             break;
+        case "home":
+        default:
+            // Volvemos al dashboard; opcionalmente refrescamos stats
+            if (typeof fetchUserStats === "function") fetchUserStats();
+            if (typeof fetchProgressData === "function") fetchProgressData();
+            break;
     }
+
+    // Scroll al principio de la página al cambiar de sección
+    window.scrollTo({ top: 0, behavior: "smooth" });
 }
 
 // --- FUNCIONES DE AUTENTICACIÓN ---
