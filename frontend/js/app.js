@@ -1210,10 +1210,13 @@ async function analyzeWriting(e) {
         resDiv.innerHTML = html;
     } catch (err) {
         console.error("Writing Error:", err);
+
         resDiv.innerHTML = `
-            <div class="p-4 bg-rose-50 dark:bg-rose-950/50 text-rose-800 dark:text-rose-200 border border-rose-200 dark:border-rose-800 rounded-xl font-medium">
-                ⚠️ Ocurrió un error al conectar con el servidor.
+            <div class="p-4 bg-rose-50 dark:bg-rose-950/50 text-rose-800 dark:text-rose-200 border border-rose-200 dark:border-rose-800 rounded-xl font-medium flex items-center gap-2">
+                <span class="material-symbols-outlined text-lg" aria-hidden="true">warning</span>
+                <span>Ocurrió un error al conectar con el servidor.</span>
             </div>`;
+
         await Swal.fire({
             icon: "error",
             title: "Error",
@@ -1323,7 +1326,7 @@ async function conectarConServidorRender(
     method = "GET",
     body = null,
     showLoading = false,
-) {
+    ) {
     if (!authToken) {
         console.error("No hay token de autenticación.");
         showLoginModal();
@@ -1341,8 +1344,8 @@ async function conectarConServidorRender(
                 toast: true,
                 position: "top-end",
                 icon: "info",
-                title: "El servidor está tardando…",
-                text: "Puede ser el arranque en frío de Render.",
+                title: "Estamos preparando el servicio…",
+                text: "La primera conexión puede tardar unos segundos. ¡Gracias por esperar!",
                 showConfirmButton: false,
                 timer: 6000,
                 timerProgressBar: true,
@@ -1372,8 +1375,8 @@ async function conectarConServidorRender(
             console.error("Timeout al conectar con el backend.");
             Swal.fire({
                 icon: "warning",
-                title: "El servidor tardó demasiado",
-                text: "Render puede tardar hasta 60 s en despertar. Intenta de nuevo en un momento.",
+                title: "La conexión está tardando más de lo esperado",
+                text: "El servicio está tardando un poco en estar disponible. Inténtalo de nuevo en unos segundos.",
                 confirmButtonColor: "#4f46e5",
             });
         } else {
