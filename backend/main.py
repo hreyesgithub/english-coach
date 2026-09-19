@@ -34,7 +34,6 @@ from fastapi.responses import JSONResponse, StreamingResponse
 # Google Gemini API (Generative AI) para roleplay y escritura
 from google import genai
 from google.genai import types
-import os
 
 from pydantic import BaseModel
 from starlette.middleware.base import BaseHTTPMiddleware
@@ -95,25 +94,13 @@ GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 GEMINI_MODEL_NAME = os.getenv("GEMINI_MODEL_NAME", "gemini-2.5-flash")
 _gemini_model = None
 if GEMINI_API_KEY:
-    genai.configure(api_key=GEMINI_API_KEY)  # type: ignore
+    # Inicializar cliente de Gemini para uso general
+    clientGemini = genai.Client(api_key=GEMINI_API_KEY)
     logger.info("Gemini configurado correctamente.")
 else:
     logger.warning(
         "GEMINI_API_KEY no configurada: el Roleplay usará respuestas de respaldo."
     )
-
-# Inicializar cliente de Gemini para uso general
-clientGemini = genai.Client(api_key=os.environ.get("GEMINI_API_KEY"))
-
-def get_gemini_model(system_instruction: str):
-    """Crea (o reutiliza) el modelo Gemini con instrucción de sistema nativa."""
-    global _gemini_model
-    if _gemini_model is None and GEMINI_API_KEY:
-        _gemini_model = genai.GenerativeModel(  # type: ignore
-            GEMINI_MODEL_NAME,
-            system_instruction=system_instruction,
-        )
-    return _gemini_model
 
 
 # --- CARGA DE CONTENIDO DESDE ARCHIVOS JSON ---
