@@ -615,13 +615,65 @@
                                 </p>
                             </div>
                         </div>
-                        <button
-                            type="button"
-                            onclick="closeRoleplayChat()"
-                            class="text-xs bg-indigo-700 hover:bg-indigo-900 text-white px-3 py-1.5 rounded-lg transition font-semibold">
-                            <i class="fa-solid fa-xmark"></i>
-                            Cambiar Escenario
-                        </button>
+                        <div class="flex items-center gap-2">
+                            <button
+                                type="button"
+                                id="rp-info-toggle"
+                                data-action="toggle-rp-info"
+                                class="text-xs bg-indigo-700 hover:bg-indigo-900 text-white px-3 py-1.5 rounded-lg transition font-semibold flex items-center gap-1">
+                                <i class="fa-solid fa-circle-info"></i>
+                                Info
+                            </button>
+                            <button
+                                type="button"
+                                onclick="closeRoleplayChat()"
+                                class="text-xs bg-indigo-700 hover:bg-indigo-900 text-white px-3 py-1.5 rounded-lg transition font-semibold flex items-center gap-1">
+                                <i class="fa-solid fa-xmark"></i>
+                                Cambiar
+                            </button>
+                        </div>
+                    </div>
+                    <!-- Panel de información del escenario (colapsable) -->
+                    <div id="rp-info-panel"
+                        class="hidden border-b border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800">
+                        <div class="p-4 space-y-4 max-h-64 overflow-y-auto">
+
+                            <!-- Gramática objetivo -->
+                            <div id="rp-grammar-block" class="hidden">
+                                <div class="flex items-center gap-1.5 mb-1">
+                                    <span class="material-symbols-outlined text-indigo-500 text-[16px]">rule</span>
+                                    <span class="text-xs font-bold text-slate-700 dark:text-slate-200 uppercase tracking-wider">
+                                        Gramática objetivo
+                                    </span>
+                                </div>
+                                <p id="rp-grammar-text"
+                                class="text-sm text-slate-700 dark:text-slate-300 pl-6 leading-snug"></p>
+                            </div>
+
+                            <!-- Consejo cultural -->
+                            <div id="rp-cultural-block" class="hidden">
+                                <div class="flex items-center gap-1.5 mb-1">
+                                    <span class="material-symbols-outlined text-amber-500 text-[16px]">public</span>
+                                    <span class="text-xs font-bold text-slate-700 dark:text-slate-200 uppercase tracking-wider">
+                                        Consejo cultural
+                                    </span>
+                                </div>
+                                <p id="rp-cultural-text"
+                                class="text-sm text-slate-700 dark:text-slate-300 pl-6 leading-snug italic"></p>
+                            </div>
+
+                            <!-- Vocabulario clave -->
+                            <div id="rp-vocab-block" class="hidden">
+                                <div class="flex items-center gap-1.5 mb-2">
+                                    <span class="material-symbols-outlined text-emerald-500 text-[16px]">school</span>
+                                    <span class="text-xs font-bold text-slate-700 dark:text-slate-200 uppercase tracking-wider">
+                                        Vocabulario clave <span class="text-slate-400 dark:text-slate-500 font-normal normal-case">(clic para escuchar)</span>
+                                    </span>
+                                </div>
+                                <ul id="rp-vocab-list" class="space-y-2 pl-6"></ul>
+                            </div>
+
+                        </div>
                     </div>
                     <div
                         id="rp-messages"

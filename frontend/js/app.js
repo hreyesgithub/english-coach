@@ -1459,10 +1459,13 @@ async function submitSRSReview(success) {
 
 // --- IPA MATRIZ FONÉTICA ---
 async function fetchIPAMatrix() {
+    const containers = ["vowels-grid", "diphthongs-grid", "consonants-grid"];
+
     try {
         const res = await conectarConServidorRender("/api/ipa-matrix");
 
-        if (!res.ok) return;
+        if (!res.ok) throw new Error("Error en la respuesta del servidor");
+
         const data = await res.json();
 
         renderPhonemeCategory("vowels-grid", data.vowels);
@@ -1470,6 +1473,11 @@ async function fetchIPAMatrix() {
         renderPhonemeCategory("consonants-grid", data.consonants);
     } catch (err) {
         console.error("Error IPA:", err);
+        // Mostrar mensaje de error en la UI
+        containers.forEach(id => {
+            const grid = document.getElementById(id);
+            if (grid) grid.innerHTML = `<div class="text-rose-500 p-4">No se pudo cargar la matriz fonética. Intenta recargar.</div>`;
+        });
     }
 }
 
@@ -1489,14 +1497,20 @@ const IPA_TYPE_COLORS = {
         "bg-indigo-100 text-indigo-800 dark:bg-indigo-900/50 dark:text-indigo-300",
 };
 
-const IPA_TYPE_DEFAULT_COLOR =
-    "bg-slate-100 text-slate-700 dark:bg-slate-700 dark:text-slate-300";
+const IPA_TYPE_DEFAULT_COLOR = "bg-slate-100 text-slate-700 dark:bg-slate-700 dark:text-slate-300";
 
 function renderPhonemeCategory(containerId, items) {
     const grid = document.getElementById(containerId);
     if (!grid) return;
 
-    grid.innerHTML = items
+    // Orden ascendente por dificultad (los sin dato quedan al final)
+    const ordered = [...items].sort((a, b) => {
+        const da = Number(a.srs_difficulty) || 99;
+        const db = Number(b.srs_difficulty) || 99;
+        return da - db;
+    });
+
+    grid.innerHTML = ordered
         .map((item, index) => {
             const truncate = (str, max) =>
                 str.length > max ? str.slice(0, max) + "…" : str;
@@ -1505,20 +1519,113 @@ function renderPhonemeCategory(containerId, items) {
             const symbol = escapeHtml(item.symbol);
             const ipaEx = escapeHtml(item.ipa_ex);
             const type = escapeHtml(item.type);
-            const shortHint = escapeHtml(
-                truncate(item.spanish_equivalent_or_hack, 300),
-            );
-            const shortError = escapeHtml(
-                truncate(item.common_error_spanish, 300),
-            );
+            const shortHint = escapeHtml(truncate(item.spanish_equivalent_or_hack, 300));
+            const shortError = escapeHtml(truncate(item.common_error_spanish, 300));
             const hintFull = escapeHtml(item.spanish_equivalent_or_hack);
             const errorFull = escapeHtml(item.common_error_spanish);
             const pairs = escapeHtml(item.minimal_pairs.join(" · "));
             const pairsFull = escapeHtml(item.minimal_pairs.join("; "));
             const spellings = item.common_spellings.map(escapeHtml);
-            const typeColor =
-                IPA_TYPE_COLORS[item.type] || IPA_TYPE_DEFAULT_COLOR;
             const cardId = makeSafeId(`${containerId}-${index}`);
+
+            // ───────── NUEVOS CAMPOS ─────────
+            const srsDifficulty = Number(item.srs_difficulty) || 0;
+            const practicePhrase = escapeHtml(item.practice_phrase || "");
+            const wordPositions = item.word_positions || null;
+
+            // Badge de dificultad (solo si está entre 1 y 5)
+            const difficultyColors = {
+                1: "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300",
+                2: "bg-lime-100 text-lime-700 dark:bg-lime-900/40 dark:text-lime-300",
+                3: "bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300",
+                4: "bg-orange-100 text-orange-700 dark:bg-orange-900/40 dark:text-orange-300",
+                5: "bg-rose-100 text-rose-700 dark:bg-rose-900/40 dark:text-rose-300",
+            };
+            const difficultyLabels = {
+                1: "Muy fácil",
+                2: "Fácil",
+                3: "Intermedio",
+                4: "Difícil",
+                5: "Muy difícil",
+            };
+            const difficultyBadge =
+                srsDifficulty >= 1 && srsDifficulty <= 5
+                    ? `<span class="px-2 py-0.5 rounded-full text-[10px] font-bold tracking-wider ${difficultyColors[srsDifficulty]}"
+                            title="Dificultad SRS: ${difficultyLabels[srsDifficulty]}"
+                            aria-label="Dificultad ${difficultyLabels[srsDifficulty]}">
+                           ${"●".repeat(srsDifficulty)}${"○".repeat(5 - srsDifficulty)}
+                       </span>`
+                    : "";
+
+            // Chip de frase de práctica (cuerpo de la tarjeta)
+            const practiceBlock = practicePhrase
+                ? `<div class="mt-3 p-2.5 rounded-lg bg-cyan-50 dark:bg-cyan-950/40
+                              border border-cyan-200 dark:border-cyan-800/60
+                              flex items-center justify-between gap-2 cursor-pointer
+                              hover:bg-cyan-100 dark:hover:bg-cyan-900/60 transition"
+                        data-action="play-audio"
+                        data-text="${practicePhrase}"
+                        title="Escuchar frase de práctica">
+                       <span class="text-[11px] text-cyan-900 dark:text-cyan-100 italic flex-1 leading-snug">
+                           <span class="material-symbols-outlined text-[12px] align-middle mr-1">record_voice_over</span>
+                           ${practicePhrase}
+                       </span>
+                       <span class="material-symbols-outlined text-cyan-600 dark:text-cyan-400 text-[16px] shrink-0">volume_up</span>
+                   </div>`
+                : "";
+
+            // Bloque de posiciones de la palabra (solo en "Ver más")
+            let positionsBlock = "";
+            if (
+                wordPositions &&
+                (wordPositions.initial || wordPositions.medial || wordPositions.final)
+            ) {
+                // Convierte "eat /iːt/" → { word: "eat", ipa: "/iːt/" }
+                const parsePosition = (raw) => {
+                    if (!raw) return null;
+                    const s = String(raw).trim();
+                    const word = s.split(/\s+/)[0] || "";
+                    const ipaMatch = s.match(/\/[^/]+\//);
+                    return { word, ipa: ipaMatch ? ipaMatch[0] : "" };
+                };
+
+                const rows = [
+                    ["Inicial", parsePosition(wordPositions.initial)],
+                    ["Media",   parsePosition(wordPositions.medial)],
+                    ["Final",   parsePosition(wordPositions.final)],
+                ]
+                    .filter(([, v]) => v && v.word)
+                    .map(([label, v]) => {
+                        const safeWord = escapeHtml(v.word);
+                        const safeIpa = escapeHtml(v.ipa);
+                        return `
+                        <div class="flex items-center gap-2">
+                            <span class="font-semibold text-slate-500 dark:text-slate-400 shrink-0 w-14 text-[11px]">${label}:</span>
+                            <span class="cursor-pointer hover:underline flex items-baseline gap-1"
+                                  data-action="play-audio"
+                                  data-text="${safeWord}"
+                                  title="Escuchar ${safeWord}">
+                                <span class="text-slate-700 dark:text-slate-200 font-mono text-[11px]">${safeWord}</span>
+                                <span class="text-slate-400 dark:text-slate-500 font-mono text-[10px]">${safeIpa}</span>
+                            </span>
+                        </div>`;
+                    })
+                    .join("");
+
+                if (rows) {
+                    positionsBlock = `
+                        <div class="pt-2 border-t border-slate-200 dark:border-slate-700">
+                            <div class="flex items-center gap-1.5 mb-1.5">
+                                <span class="material-symbols-outlined text-indigo-500 text-[14px]">pin_drop</span>
+                                <span class="font-semibold">Posición en la palabra:</span>
+                            </div>
+                            <div class="space-y-1 pl-1">
+                                ${rows}
+                            </div>
+                        </div>`;
+                }
+            }
+            // ───────── FIN NUEVOS CAMPOS ─────────
 
             return `
             <div class="phoneme-card group bg-white dark:bg-slate-800 rounded-2xl shadow-sm hover:shadow-lg
@@ -1538,7 +1645,10 @@ function renderPhonemeCategory(containerId, items) {
                     </button>
                 </div>
 
-                <div class="mt-1 text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">${type}</div>
+                <div class="mt-1 flex items-center justify-between gap-2">
+                    <span class="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">${type}</span>
+                    ${difficultyBadge}
+                </div>
 
                 <div class="mt-3 flex flex-wrap gap-1.5">
                     ${spellings
@@ -1564,6 +1674,8 @@ function renderPhonemeCategory(containerId, items) {
                     <span class="material-symbols-outlined text-rose-500 text-[12px] align-middle mr-1.5">warning</span>
                     ${shortError}
                 </div>
+
+                ${practiceBlock}
 
                 <div class="mt-3 text-center">
                     <button type="button"
@@ -1593,6 +1705,7 @@ function renderPhonemeCategory(containerId, items) {
                         <span class="material-symbols-outlined text-slate-500 text-[14px] align-middle mr-1.5">sync</span>
                         <span class="font-semibold">Pares mínimos:</span> ${pairsFull}
                     </div>
+                    ${positionsBlock}
                 </div>
             </div>`;
         })
@@ -1676,12 +1789,21 @@ function registerGlobalDelegatedListeners() {
             return;
         }
 
-        // ─── 6. Iniciar escenario roleplay ───
+        // ─── 6a. Iniciar escenario roleplay ───
         const scenarioCard = e.target.closest("[data-action='start-roleplay']");
         if (scenarioCard) {
             e.preventDefault();
             e.stopPropagation();
             startRoleplaySession(scenarioCard.dataset.scenarioId);
+            return;
+        }
+
+        // ─── 6b. Toggle panel de información del roleplay ───
+        const rpInfoBtn = e.target.closest("[data-action='toggle-rp-info']");
+        if (rpInfoBtn) {
+            e.preventDefault();
+            e.stopPropagation();
+            toggleRoleplayInfo();
             return;
         }
 
@@ -1739,26 +1861,53 @@ function renderScenariosGrid(scenarios) {
             const safeTitle = escapeHtml(sc.title);
             const safeDesc = escapeHtml(sc.description);
             const safeIcon = escapeAttr(normalizeFaIcon(sc.icon));
+            const safeLevel = escapeHtml(sc.difficulty_level || "A1");
+            const safeGrammar = escapeHtml(sc.grammar_focus || "");
+
+            // Colores por nivel MCER
+            const levelColors = {
+                A1: "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/50 dark:text-emerald-300",
+                A2: "bg-lime-100 text-lime-800 dark:bg-lime-900/50 dark:text-lime-300",
+                B1: "bg-amber-100 text-amber-800 dark:bg-amber-900/50 dark:text-amber-300",
+                B2: "bg-orange-100 text-orange-800 dark:bg-orange-900/50 dark:text-orange-300",
+                C1: "bg-rose-100 text-rose-800 dark:bg-rose-900/50 dark:text-rose-300",
+            };
+            const levelClass =
+                levelColors[sc.difficulty_level] || levelColors.A1;
 
             return `
-            <div data-action="start-roleplay"
-                 data-scenario-id="${safeId}"
-                 class="p-5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700
-                        rounded-xl hover:border-indigo-500 dark:hover:border-indigo-400
-                        hover:shadow-md cursor-pointer transition flex flex-col justify-between">
-                <div>
-                    <div class="w-12 h-12 bg-indigo-50 dark:bg-indigo-950/70 text-indigo-600 dark:text-indigo-400
-                                rounded-xl flex items-center justify-center text-2xl mb-4">
-                        <i class="${safeIcon}"></i>
+                <div data-action="start-roleplay"
+                    data-scenario-id="${safeId}"
+                    class="relative p-5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700
+                            rounded-xl hover:border-indigo-500 dark:hover:border-indigo-400
+                            hover:shadow-md cursor-pointer transition flex flex-col justify-between">
+                    <div>
+                        <div class="flex items-start justify-between gap-2 mb-3">
+                            <div class="w-12 h-12 bg-indigo-50 dark:bg-indigo-950/70 text-indigo-600 dark:text-indigo-400
+                                        rounded-xl flex items-center justify-center text-2xl shrink-0">
+                                <i class="${safeIcon}"></i>
+                            </div>
+                            <span class="px-2 py-0.5 rounded-full text-[10px] font-bold tracking-wider ${levelClass}"
+                                title="Nivel MCER del escenario">
+                                ${safeLevel}
+                            </span>
+                        </div>
+                        <h3 class="font-bold text-slate-800 dark:text-slate-100 text-lg mb-1">${safeTitle}</h3>
+                        <p class="text-xs text-slate-600 dark:text-slate-300 mb-2">${safeDesc}</p>
+                        ${
+                            safeGrammar
+                                ? `<p class="text-[11px] text-indigo-600 dark:text-indigo-400 flex items-start gap-1 leading-snug">
+                                    <span class="material-symbols-outlined text-[13px] shrink-0 mt-0.5">rule</span>
+                                    <span class="italic">${safeGrammar}</span>
+                                </p>`
+                                : ""
+                        }
                     </div>
-                    <h3 class="font-bold text-slate-800 dark:text-slate-100 text-lg mb-1">${safeTitle}</h3>
-                    <p class="text-xs text-slate-600 dark:text-slate-300 mb-3">${safeDesc}</p>
-                </div>
-                <span class="text-xs font-semibold text-indigo-600 dark:text-indigo-400 flex items-center gap-1">
-                    Iniciar práctica
-                    <span class="material-symbols-outlined text-[14px]">arrow_forward</span>
-                </span>
-            </div>`;
+                    <span class="text-xs font-semibold text-indigo-600 dark:text-indigo-400 flex items-center gap-1 mt-3">
+                        Iniciar práctica
+                        <span class="material-symbols-outlined text-[14px]">arrow_forward</span>
+                    </span>
+                </div>`;
         })
         .join("");
 }
@@ -1781,6 +1930,25 @@ function startRoleplaySession(scenarioId) {
         headerIcon.className = `${normalizeFaIcon(sc.icon)} text-2xl`;
     }
 
+    // ─── POBLAR EL PANEL DE INFORMACIÓN ───
+    populateRoleplayInfoPanel(sc);
+
+    // ─── NUEVO: ocultar el panel por defecto (el usuario lo abre si quiere) ───
+    const infoPanel = document.getElementById("rp-info-panel");
+    if (infoPanel) infoPanel.classList.add("hidden");
+
+    // ─── Reset del botón Info ───
+    const infoBtn = document.getElementById("rp-info-toggle");
+    if (infoBtn) {
+        const icon = infoBtn.querySelector("i");
+        if (icon) icon.className = "fa-solid fa-circle-info";
+        // Restaurar texto si fue modificado por toggleRoleplayInfo
+        const label = infoBtn.lastChild;
+        if (label && label.nodeType === Node.TEXT_NODE) {
+            label.nodeValue = " Info";
+        }
+    }
+
     const messagesContainer = document.getElementById("rp-messages");
     messagesContainer.innerHTML = "";
 
@@ -1788,6 +1956,78 @@ function startRoleplaySession(scenarioId) {
     playNaturalAudio(sc.initial_message);
     renderRPSuggestions(sc.suggested_replies);
     roleplayHistory.push({ role: "assistant", content: sc.initial_message });
+}
+
+function populateRoleplayInfoPanel(sc) {
+    // ── Gramática objetivo ──
+    const grammarBlock = document.getElementById("rp-grammar-block");
+    const grammarText = document.getElementById("rp-grammar-text");
+    if (grammarBlock && grammarText) {
+        if (sc.grammar_focus && sc.grammar_focus.trim()) {
+            grammarText.textContent = sc.grammar_focus;
+            grammarBlock.classList.remove("hidden");
+        } else {
+            grammarBlock.classList.add("hidden");
+        }
+    }
+
+    // ── Consejo cultural ──
+    const culturalBlock = document.getElementById("rp-cultural-block");
+    const culturalText = document.getElementById("rp-cultural-text");
+    if (culturalBlock && culturalText) {
+        if (sc.cultural_tip && sc.cultural_tip.trim()) {
+            culturalText.textContent = sc.cultural_tip;
+            culturalBlock.classList.remove("hidden");
+        } else {
+            culturalBlock.classList.add("hidden");
+        }
+    }
+
+    // ── Vocabulario clave ──
+    const vocabBlock = document.getElementById("rp-vocab-block");
+    const vocabList = document.getElementById("rp-vocab-list");
+    if (!vocabBlock || !vocabList) return;
+
+    const vocab = Array.isArray(sc.target_vocabulary) ? sc.target_vocabulary : [];
+    if (vocab.length === 0) {
+        vocabBlock.classList.add("hidden");
+        vocabList.innerHTML = "";
+        return;
+    }
+
+    vocabBlock.classList.remove("hidden");
+    vocabList.innerHTML = vocab
+        .map((v) => {
+            const safeWord = escapeHtml(v.word || "");
+            const safeMeaning = escapeHtml(v.meaning || "");
+            const safeContext = escapeHtml(v.usage_context || "");
+            return `
+            <li class="text-sm">
+                <div class="flex items-start gap-2">
+                    <button type="button"
+                            data-action="play-audio"
+                            data-text="${safeWord}"
+                            class="shrink-0 mt-0.5 text-emerald-600 dark:text-emerald-400 hover:scale-110 transition"
+                            title="Escuchar '${safeWord}'"
+                            aria-label="Escuchar pronunciación de ${safeWord}">
+                        <span class="material-symbols-outlined text-[18px]">volume_up</span>
+                    </button>
+                    <div class="flex-1">
+                        <p>
+                            <span class="font-bold text-slate-800 dark:text-slate-100">${safeWord}</span>
+                            <span class="text-slate-500 dark:text-slate-400 mx-1">·</span>
+                            <span class="text-slate-600 dark:text-slate-300">${safeMeaning}</span>
+                        </p>
+                        ${
+                            safeContext
+                                ? `<p class="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5 italic leading-snug">${safeContext}</p>`
+                                : ""
+                        }
+                    </div>
+                </div>
+            </li>`;
+        })
+        .join("");
 }
 
 function closeRoleplayChat() {
@@ -1857,21 +2097,6 @@ function renderRPSuggestions(replies) {
         })
         .join("");
 }
-
-/*function useRPSuggestionFromData(btnEl, e) {
-    if (e) {
-        e.preventDefault();
-        e.stopPropagation();
-    }
-    const rawText = btnEl.getAttribute("data-reply");
-    if (!rawText) return;
-    const text = decodeURIComponent(rawText);
-    const input = document.getElementById("rp-transcript-input");
-    if (input) {
-        input.value = text;
-    }
-    sendRoleplayMessage(e);
-}*/
 
 function toggleRoleplayMic() {
     const btn = document.getElementById("rp-mic-btn");
@@ -1999,18 +2224,6 @@ async function sendRoleplayMessage(e) {
     }
 }
 
-/*function selectSuggestedResponse(text, e) {
-    if (e) {
-        e.preventDefault();
-        e.stopPropagation();
-    }
-    const input = document.getElementById("rp-transcript-input");
-    if (input) {
-        input.value = text;
-    }
-    sendRoleplayMessage(e);
-}*/
-
 function renderRoleplaySuggestions(suggestions) {
     const container = document.getElementById("rp-suggestions-container");
     if (!container) return;
@@ -2035,6 +2248,29 @@ function renderRoleplaySuggestions(suggestions) {
     `,
         )
         .join("");
+}
+
+function toggleRoleplayInfo() {
+    const panel = document.getElementById("rp-info-panel");
+    const btn = document.getElementById("rp-info-toggle");
+    if (!panel) return;
+
+    const willShow = panel.classList.contains("hidden");
+    panel.classList.toggle("hidden", !willShow);
+
+    if (btn) {
+        const icon = btn.querySelector("i");
+        if (icon) {
+            icon.className = willShow
+                ? "fa-solid fa-circle-info"
+                : "fa-solid fa-xmark";
+        }
+        // Opcional: cambiar texto
+        const label = btn.lastChild;
+        if (label && label.nodeType === Node.TEXT_NODE) {
+            label.nodeValue = willShow ? " Info" : " Cerrar";
+        }
+    }
 }
 
 // --- PLACEMENT TEST ---

@@ -1,38 +1,323 @@
 [
-    {
-        "id": "coffee_shop",
-        "title": "Ordering Coffee",
-        "icon": "fa-solid fa-mug-hot",
-        "role": "Barista",
-        "description": "Estás en una cafetería en Londres y deseas ordenar tu bebida y un snack.",
-        "initial_message": "Hello! Welcome to Costa Coffee. What can I get started for you today?",
-        "suggested_replies": [
-            "Hi! I would like a medium cappuccino, please.",
-            "Hello, do you have any oat milk available?"
-        ]
-    },
-    {
-        "id": "job_interview",
-        "title": "Tech Job Interview",
-        "icon": "fa-solid fa-briefcase",
-        "role": "Interviewer",
-        "description": "Una entrevista inicial para un puesto de desarrollo de software.",
-        "initial_message": "Good morning! Thanks for coming in. To start, could you briefly introduce yourself and your background?",
-        "suggested_replies": [
-            "Good morning! Sure, I am a software engineer with experience in Web & Backend APIs.",
-            "Hi! I've been working as a developer managing databases and automation scripts."
-        ]
-    },
-    {
-        "id": "airport_checkin",
-        "title": "Airport Check-In",
-        "icon": "fa-solid fa-plane-departure",
-        "role": "Agent",
-        "description": "Estás frente al mostrador de facturación antes de tu vuelo internacional.",
-        "initial_message": "Good afternoon! May I please see your passport and flight booking confirmation?",
-        "suggested_replies": [
-            "Here is my passport and ticket confirmation.",
-            "Sure! Can I check two bags for this flight?"
-        ]
-    }
+  {
+    "id": "coffee_shop",
+    "title": "Ordering Coffee",
+    "icon": "fa-solid fa-mug-hot",
+    "role": "Barista",
+    "difficulty_level": "A1",
+    "description": "Estás en una cafetería en Londres y deseas ordenar tu bebida y un snack.",
+    "grammar_focus": "Polite requests with 'would like' and 'can I'",
+    "cultural_tip": "En cafeterías británicas es habitual usar 'please' y 'thank you' al hacer un pedido. Si quieres consumir en el local, puedes decir 'for here'; para llevar, 'to take away'.",
+    "initial_message": "Hello! Welcome to Costa Coffee. What can I get started for you today?",
+    "suggested_replies": [
+      "Hi! I would like a medium cappuccino, please.",
+      "Hello, do you have any oat milk available?"
+    ],
+    "target_vocabulary": [
+      {
+        "word": "take away",
+        "meaning": "para llevar",
+        "usage_context": "Úsalo cuando quieras pedir comida o bebida para consumir fuera del establecimiento."
+      },
+      {
+        "word": "decaf",
+        "meaning": "descafeinado",
+        "usage_context": "Se utiliza para pedir café con poca o ninguna cafeína, por ejemplo: 'Can I have a decaf latte?'"
+      },
+      {
+        "word": "topping",
+        "meaning": "ingrediente adicional o cobertura",
+        "usage_context": "Se usa para hablar de ingredientes que se añaden encima de una bebida o comida, como nata o chocolate."
+      },
+      {
+        "word": "receipt",
+        "meaning": "recibo",
+        "usage_context": "Úsalo cuando necesites pedir o confirmar el recibo de tu compra."
+      }
+    ]
+  },
+  {
+    "id": "job_interview",
+    "title": "Tech Job Interview",
+    "icon": "fa-solid fa-briefcase",
+    "role": "Interviewer",
+    "difficulty_level": "B1",
+    "description": "Una entrevista inicial para un puesto de desarrollo de software.",
+    "grammar_focus": "Present Perfect and Past Simple for describing professional experience",
+    "cultural_tip": "En entrevistas laborales en inglés suele ser útil responder de forma estructurada y relacionar cada experiencia con una habilidad o resultado concreto. Mantén un tono profesional, pero natural.",
+    "initial_message": "Good morning! Thanks for coming in. To start, could you briefly introduce yourself and your background?",
+    "suggested_replies": [
+      "Good morning! Sure, I am a software engineer with experience in Web & Backend APIs.",
+      "Hi! I've been working as a developer managing databases and automation scripts."
+    ],
+    "target_vocabulary": [
+      {
+        "word": "background",
+        "meaning": "experiencia o trayectoria profesional",
+        "usage_context": "Se usa para describir estudios, experiencia y conocimientos que forman parte de tu trayectoria."
+      },
+      {
+        "word": "hands-on experience",
+        "meaning": "experiencia práctica",
+        "usage_context": "Úsalo para destacar que has trabajado directamente con una tecnología o tarea."
+      },
+      {
+        "word": "take on",
+        "meaning": "asumir o encargarse de",
+        "usage_context": "Se utiliza para hablar de nuevas responsabilidades o proyectos, por ejemplo: 'I took on a leadership role.'"
+      },
+      {
+        "word": "strength",
+        "meaning": "fortaleza o punto fuerte",
+        "usage_context": "Es útil para explicar una habilidad profesional en la que destacas."
+      },
+      {
+        "word": "deadline",
+        "meaning": "fecha límite",
+        "usage_context": "Se utiliza para hablar de la fecha o momento en que debe estar terminado un proyecto o tarea."
+      }
+    ]
+  },
+  {
+    "id": "airport_checkin",
+    "title": "Airport Check-In",
+    "icon": "fa-solid fa-plane-departure",
+    "role": "Agent",
+    "difficulty_level": "A2",
+    "description": "Estás frente al mostrador de facturación antes de tu vuelo internacional.",
+    "grammar_focus": "Questions and requests with 'Can I', 'Could I', and 'May I'",
+    "cultural_tip": "En un aeropuerto internacional conviene tener preparados el pasaporte, la reserva y cualquier documento requerido. Responde de forma breve y clara a las preguntas del personal.",
+    "initial_message": "Good afternoon! May I please see your passport and flight booking confirmation?",
+    "suggested_replies": [
+      "Here is my passport and ticket confirmation.",
+      "Sure! Can I check two bags for this flight?"
+    ],
+    "target_vocabulary": [
+      {
+        "word": "check in",
+        "meaning": "facturar o registrarse para un vuelo",
+        "usage_context": "Se usa al hablar del proceso de registrarse para el vuelo y entregar el equipaje."
+      },
+      {
+        "word": "carry-on",
+        "meaning": "equipaje de mano",
+        "usage_context": "Se refiere al equipaje pequeño que puedes llevar contigo dentro del avión."
+      },
+      {
+        "word": "baggage allowance",
+        "meaning": "franquicia de equipaje",
+        "usage_context": "Úsalo para preguntar cuánto equipaje puedes llevar sin pagar un suplemento."
+      },
+      {
+        "word": "boarding pass",
+        "meaning": "tarjeta de embarque",
+        "usage_context": "Es el documento que necesitas para pasar a la zona de embarque y subir al avión."
+      }
+    ]
+  },
+  {
+    "id": "doctor_symptoms",
+    "title": "Explaining Symptoms to a Doctor",
+    "icon": "fa-solid fa-user-doctor",
+    "role": "Doctor",
+    "difficulty_level": "B1",
+    "description": "Tienes una cita médica y necesitas explicar tus síntomas, cuándo comenzaron y cómo han cambiado.",
+    "grammar_focus": "Present Perfect and Past Simple for describing symptoms and duration",
+    "cultural_tip": "En una consulta médica en inglés, intenta describir cuándo empezaron los síntomas, su intensidad y cualquier medicamento que estés tomando. Si no entiendes una pregunta, puedes decir 'Could you explain that again, please?'",
+    "initial_message": "Good morning. What brings you in today?",
+    "suggested_replies": [
+      "I've had a sore throat for three days, and I've been feeling very tired.",
+      "I started feeling sick yesterday, and I also have a headache and a mild fever."
+    ],
+    "target_vocabulary": [
+      {
+        "word": "sore throat",
+        "meaning": "dolor de garganta",
+        "usage_context": "Se usa para describir irritación o dolor en la garganta."
+      },
+      {
+        "word": "dizzy",
+        "meaning": "mareado",
+        "usage_context": "Úsalo cuando sientas que pierdes el equilibrio o que todo parece dar vueltas."
+      },
+      {
+        "word": "symptom",
+        "meaning": "síntoma",
+        "usage_context": "Es un término general para describir una señal o molestia relacionada con una enfermedad."
+      },
+      {
+        "word": "prescription",
+        "meaning": "receta médica",
+        "usage_context": "Se utiliza para hablar del documento o indicación médica necesaria para obtener determinados medicamentos."
+      },
+      {
+        "word": "get better",
+        "meaning": "mejorar o recuperarse",
+        "usage_context": "Es una expresión cotidiana para hablar de la recuperación de una enfermedad."
+      }
+    ]
+  },
+  {
+    "id": "meeting_partner_friends",
+    "title": "Meeting Your Partner's Friends",
+    "icon": "fa-solid fa-users",
+    "role": "Friend of your partner",
+    "difficulty_level": "B1",
+    "description": "Conoces por primera vez a varios amigos de tu pareja durante una reunión informal.",
+    "grammar_focus": "Present Perfect for experiences and follow-up questions in small talk",
+    "cultural_tip": "En situaciones sociales informales es habitual hacer preguntas abiertas sobre viajes, trabajo, hobbies o intereses. Evita preguntas demasiado personales al principio y muestra interés haciendo preguntas de seguimiento.",
+    "initial_message": "Hi! It's great to finally meet you. I've heard so much about you. How do you know everyone here?",
+    "suggested_replies": [
+      "Nice to meet you too! I've known Sarah for about five years.",
+      "It's great to meet you! We met at university, and we've stayed in touch ever since."
+    ],
+    "target_vocabulary": [
+      {
+        "word": "get along",
+        "meaning": "llevarse bien",
+        "usage_context": "Se usa para hablar de una relación positiva entre personas, por ejemplo: 'We get along really well.'"
+      },
+      {
+        "word": "stay in touch",
+        "meaning": "mantener el contacto",
+        "usage_context": "Úsalo cuando hables de mantener una relación con alguien después de conocerse o separarse."
+      },
+      {
+        "word": "catch up",
+        "meaning": "ponerse al día",
+        "usage_context": "Es muy común entre amigos que no se han visto durante un tiempo y quieren hablar sobre lo que ha ocurrido."
+      },
+      {
+        "word": "have in common",
+        "meaning": "tener en común",
+        "usage_context": "Se usa para señalar intereses, experiencias o características compartidas."
+      }
+    ]
+  },
+  {
+    "id": "restaurant_bill",
+    "title": "Correcting a Restaurant Bill",
+    "icon": "fa-solid fa-receipt",
+    "role": "Server",
+    "difficulty_level": "B1",
+    "description": "Has recibido la cuenta en un restaurante y has detectado un plato que no pediste y un cargo incorrecto.",
+    "grammar_focus": "Polite complaints and requests using 'I think', 'Could you', and 'Would you mind'",
+    "cultural_tip": "Cuando reclames un error en una cuenta, un tono calmado y específico suele funcionar mejor que una acusación directa. Explica primero el problema y después pide claramente que lo corrijan.",
+    "initial_message": "Here is your bill. Please let me know if everything looks correct.",
+    "suggested_replies": [
+      "Excuse me, I think there's a mistake. We didn't order this dessert.",
+      "Could you please check this charge? I believe we've been charged twice for the same dish."
+    ],
+    "target_vocabulary": [
+      {
+        "word": "bill",
+        "meaning": "cuenta",
+        "usage_context": "Se usa para referirse al importe que debes pagar en un restaurante."
+      },
+      {
+        "word": "charge",
+        "meaning": "cargo",
+        "usage_context": "Úsalo para hablar de una cantidad que aparece añadida a una cuenta o factura."
+      },
+      {
+        "word": "overcharged",
+        "meaning": "cobrado de más",
+        "usage_context": "Se utiliza cuando te han cobrado una cantidad superior a la que correspondía."
+      },
+      {
+        "word": "sort out",
+        "meaning": "solucionar o arreglar",
+        "usage_context": "Es una expresión informal útil para pedir que alguien resuelva un problema."
+      },
+      {
+        "word": "refund",
+        "meaning": "reembolso",
+        "usage_context": "Se utiliza cuando quieres recuperar dinero que has pagado por un producto o servicio."
+      }
+    ]
+  },
+  {
+    "id": "apartment_rental",
+    "title": "Renting an Apartment",
+    "icon": "fa-solid fa-house",
+    "role": "Landlord",
+    "difficulty_level": "B2",
+    "description": "Estás visitando un apartamento y quieres preguntar sobre el alquiler, las condiciones del contrato y los servicios incluidos.",
+    "grammar_focus": "Conditionals, modal verbs, and questions about terms and obligations",
+    "cultural_tip": "Al alquilar una vivienda en un país angloparlante, conviene preguntar claramente por el depósito, las facturas, la duración del contrato y las condiciones para finalizarlo antes de firmar.",
+    "initial_message": "Welcome! Feel free to have a look around. Do you have any questions about the apartment or the rental agreement?",
+    "suggested_replies": [
+      "Yes. Could you tell me how much the security deposit is and which utilities are included?",
+      "I'd like to know whether the lease can be renewed after the first year."
+    ],
+    "target_vocabulary": [
+      {
+        "word": "lease",
+        "meaning": "contrato de alquiler",
+        "usage_context": "Se refiere al contrato formal que establece las condiciones del alquiler de una vivienda."
+      },
+      {
+        "word": "security deposit",
+        "meaning": "depósito o fianza",
+        "usage_context": "Es el dinero que normalmente se entrega al inicio del alquiler como garantía frente a posibles daños o incumplimientos."
+      },
+      {
+        "word": "utilities",
+        "meaning": "servicios básicos",
+        "usage_context": "Suele referirse a servicios como electricidad, agua, gas o, dependiendo del contrato, internet."
+      },
+      {
+        "word": "landlord",
+        "meaning": "propietario o arrendador",
+        "usage_context": "Es la persona que alquila una propiedad a otra persona."
+      },
+      {
+        "word": "move in",
+        "meaning": "mudarse o entrar a vivir",
+        "usage_context": "Se utiliza para hablar del momento en que comienzas a vivir en una vivienda nueva."
+      }
+    ]
+  },
+  {
+    "id": "maintenance_problem",
+    "title": "Reporting a Maintenance Problem",
+    "icon": "fa-solid fa-screwdriver-wrench",
+    "role": "Property Manager",
+    "difficulty_level": "A2",
+    "description": "Vives en un apartamento alquilado y necesitas informar al administrador de que la calefacción no funciona correctamente.",
+    "grammar_focus": "Present Simple, Present Continuous, and 'There is/There are' for describing problems",
+    "cultural_tip": "Al comunicar un problema de mantenimiento, indica qué ocurre, desde cuándo sucede y si afecta a otros servicios. Sé específico y pregunta cuándo puede acudir un técnico.",
+    "initial_message": "Hello, this is the property management office. How can I help you today?",
+    "suggested_replies": [
+      "Hi. The heating isn't working, and the apartment is very cold.",
+      "There's a problem with the heating system. It stopped working last night. Could someone come and check it?"
+    ],
+    "target_vocabulary": [
+      {
+        "word": "break down",
+        "meaning": "averiarse o dejar de funcionar",
+        "usage_context": "Se usa para aparatos, máquinas o sistemas que dejan de funcionar, por ejemplo: 'The heating broke down.'"
+      },
+      {
+        "word": "leak",
+        "meaning": "fuga o escape",
+        "usage_context": "Se utiliza cuando sale agua, gas u otro líquido de una tubería o sistema de forma accidental."
+      },
+      {
+        "word": "repair",
+        "meaning": "reparar o reparación",
+        "usage_context": "Puede funcionar como verbo o sustantivo para hablar de arreglar algo que está averiado."
+      },
+      {
+        "word": "maintenance",
+        "meaning": "mantenimiento",
+        "usage_context": "Se refiere al trabajo necesario para mantener una propiedad, aparato o sistema en buen estado."
+      },
+      {
+        "word": "come out",
+        "meaning": "ir al lugar para solucionar un problema",
+        "usage_context": "En este contexto se usa cuando un técnico o trabajador se desplaza a la vivienda, por ejemplo: 'Can someone come out tomorrow?'"
+      }
+    ]
+  }
 ]
