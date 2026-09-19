@@ -170,7 +170,7 @@ async function wakeUpBackend(timeoutMs = 90000) {
             try {
                 const ctrl = new AbortController();
                 const t = setTimeout(() => ctrl.abort(), 15000);
-                const res = await apiFetch("/", {
+                const res = await apiFetch(`${API_BASE_URL}/`, {
                     method: "GET",
                     signal: ctrl.signal,
                     cache: "no-store",
@@ -196,6 +196,8 @@ async function wakeUpBackend(timeoutMs = 90000) {
         warmupPromise = null;
     }
 }
+
+console.log("[BOOT] app.js cargado");
 
 // --- INICIALIZACIÓN ---
 document.addEventListener("DOMContentLoaded", async () => {
