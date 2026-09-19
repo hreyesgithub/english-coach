@@ -182,7 +182,7 @@ async function wakeUpBackend(timeoutMs = 90000) {
             try {
                 const ctrl = new AbortController();
                 const t = setTimeout(() => ctrl.abort(), 15000);
-                const res = await apiFetch(`${API_BASE_URL}/`, {
+                const res = await fetch(`${API_BASE_URL}/`, {
                     method: "GET",
                     signal: ctrl.signal,
                     cache: "no-store",
@@ -2473,7 +2473,7 @@ function hideLoadingAlert() {
 
 // Helper específico que reutiliza el warmup
 async function apiFetch(path, options = {}) {
-    if (backendStatus !== "ready") await wakeUpBackend();
+    //if (backendStatus !== "ready") await wakeUpBackend();
 
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 90000);
