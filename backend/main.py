@@ -91,7 +91,7 @@ else:
     logger.info("AssemblyAI configurado correctamente.")
 
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
-GEMINI_MODEL_NAME = os.getenv("GEMINI_MODEL_NAME", "gemini-2.5-flash")
+GEMINI_MODEL_NAME = os.getenv("GEMINI_MODEL_NAME", "gemini-3.6-flash")
 _gemini_model = None
 if GEMINI_API_KEY:
     # Inicializar cliente de Gemini para uso general
@@ -311,29 +311,33 @@ def update_user_xp(user_id: str, xp_gain: int):
     leer-calcular-escribir en Python.
     """
     if not supabase:
+        logger.error("Supabase no inicializado en update_user_xp")
         return {"xp": 0, "level": 1, "streak": 0}
 
     # Asegura que el usuario exista antes del RPC (crea fila si es la primera vez)
-    get_user_stats(user_id)
+    # Asegurar usuario (con manejo de errores explícito)
+    try:
+        get_user_stats(user_id)
+    except Exception as e:
+        logger.error(f"Error en get_user_stats para {user_id}: {e}")
+        raise HTTPException(status_code=500, detail="Error al preparar el usuario.")
 
     try:
         rpc_res = supabase.rpc(
             "increment_xp", {"p_user_id": user_id, "p_xp": xp_gain}
         ).execute()
     except Exception as e:
-        logger.error(f"Error Supabase (increment_xp RPC): {e}")
-        raise HTTPException(status_code=503, detail="No se pudo actualizar el XP.")
+        logger.error(f"Error Supabase (increment_xp RPC): {repr(e)}")
+        raise HTTPException(status_code=503, detail=f"RPC falló: {str(e)}")
 
     if not rpc_res.data:
-        raise HTTPException(
-            status_code=500, detail="Respuesta inesperada al actualizar XP."
-        )
+        logger.error(f"RPC increment_xp devolvió data vacía: {rpc_res}")
+        raise HTTPException(status_code=500, detail="Respuesta inesperada del RPC.")
 
     raw_row = rpc_res.data[0] if isinstance(rpc_res.data, list) else rpc_res.data
     if not isinstance(raw_row, dict):
-        raise HTTPException(
-            status_code=500, detail="Formato inesperado en la respuesta del XP."
-        )
+        logger.error(f"Formato inesperado en RPC: {raw_row}")
+        raise HTTPException(status_code=500, detail="Formato inesperado en RPC.")
 
     xp_value = raw_row.get("xp", 0)
     level_value = raw_row.get("level", 1)
@@ -817,7 +821,7 @@ async def roleplay_respond(data: RoleplayMessageRequest, request: Request):
     try:
         # 3. Llamada directa con el cliente moderno de Google GenAI
         response = clientGemini.models.generate_content(
-            model='gemini-2.5-flash',
+            model=GEMINI_MODEL_NAME,
             contents=formatted_contents,
             config=types.GenerateContentConfig(
                 system_instruction=system_instruction,
@@ -827,8 +831,11 @@ async def roleplay_respond(data: RoleplayMessageRequest, request: Request):
         bot_reply = response.text
 
     except Exception as e:
-        logger.exception(f"Error específico en Gemini Roleplay: {e}")
-        bot_reply = "I'm sorry, I couldn't process that. Could you repeat?"
+        logger.error(f"Error en Gemini Roleplay: {e}")
+        raise HTTPException(
+            status_code=502,
+            detail="El tutor no está disponible en este momento.",
+        )
 
     return {
         "bot_reply": bot_reply,

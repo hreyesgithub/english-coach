@@ -2,7 +2,7 @@
     {
         "id": "coffee_shop",
         "title": "Ordering Coffee",
-        "icon": "fa-mug-hot",
+        "icon": "fa-solid fa-mug-hot",
         "role": "Barista",
         "description": "Estás en una cafetería en Londres y deseas ordenar tu bebida y un snack.",
         "initial_message": "Hello! Welcome to Costa Coffee. What can I get started for you today?",
@@ -14,7 +14,7 @@
     {
         "id": "job_interview",
         "title": "Tech Job Interview",
-        "icon": "fa-briefcase",
+        "icon": "fa-solid fa-briefcase",
         "role": "Interviewer",
         "description": "Una entrevista inicial para un puesto de desarrollo de software.",
         "initial_message": "Good morning! Thanks for coming in. To start, could you briefly introduce yourself and your background?",
@@ -26,7 +26,7 @@
     {
         "id": "airport_checkin",
         "title": "Airport Check-In",
-        "icon": "fa-plane-departure",
+        "icon": "fa-solid fa-plane-departure",
         "role": "Agent",
         "description": "Estás frente al mostrador de facturación antes de tu vuelo internacional.",
         "initial_message": "Good afternoon! May I please see your passport and flight booking confirmation?",

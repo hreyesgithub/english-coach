@@ -2,7 +2,7 @@
 // LinguaBoost Pro - Frontend Application Engine (v4.6)
 // ==========================================
 
-const DEBUG_MODE = true; // Cambiar a true para ver logs detallados en la consola
+const DEBUG_MODE = false; // Cambiar a true para ver logs detallados en la consola
 
 // ============================================================
 // GESTIÓN DEL COLD START DE RENDER
@@ -163,7 +163,12 @@ function setBackendStatus(status) {
  */
 async function wakeUpBackend(timeoutMs = 90000) {
     if (DEBUG_MODE) {
-        console.log("[WARMUP] llamada. status:", backendStatus, "promise:", !!warmupPromise);
+        console.log(
+            "[WARMUP] llamada. status:",
+            backendStatus,
+            "promise:",
+            !!warmupPromise,
+        );
     }
 
     if (backendStatus === "ready") return true;
@@ -199,7 +204,11 @@ async function wakeUpBackend(timeoutMs = 90000) {
             } catch (err) {
                 // aún no despierta: esperamos 3 s y reintentamos
                 if (DEBUG_MODE) {
-                    console.warn("[WARMUP] intento falló:", err.name, err.message);
+                    console.warn(
+                        "[WARMUP] intento falló:",
+                        err.name,
+                        err.message,
+                    );
                 }
                 await new Promise((r) => setTimeout(r, 3000));
             }
@@ -222,27 +231,35 @@ if (DEBUG_MODE) {
 // --- INICIALIZACIÓN ---
 document.addEventListener("DOMContentLoaded", async () => {
     if (DEBUG_MODE) {
-       console.log("[BOOT] DOMContentLoaded");
+        console.log("[BOOT] DOMContentLoaded");
     }
 
     initDarkMode();
     setupSpeechRecognition();
     registerGlobalDelegatedListeners();
     if (DEBUG_MODE) {
-       console.log("[BOOT] listeners registrados");
+        console.log("[BOOT] listeners registrados");
     }
 
     // 🔥 Despertamos el backend en paralelo mientras el usuario ve el login
     if (DEBUG_MODE) {
-       console.log("[BOOT] lanzando wakeUpBackend...");
+        console.log("[BOOT] lanzando wakeUpBackend...");
     }
     wakeUpBackend()
-        .then((ok) => console.log("[WARMUP] terminó con:", ok))
-        .catch((e) => console.error("[WARMUP] error:", e));
+        .then((ok) => {
+            if (DEBUG_MODE) {
+                console.log("[WARMUP] terminó con:", ok);
+            }
+        })
+        .catch((e) => {
+            if (DEBUG_MODE) {
+                 console.error("[WARMUP] error:", e);
+            }
+        });
 
     // Verificación y restauración automática de sesión con Supabase
     if (DEBUG_MODE) {
-       console.log("[BOOT] lanzando checkAutoLogin...");
+        console.log("[BOOT] lanzando checkAutoLogin...");
     }
     await checkAutoLogin();
     if (DEBUG_MODE) {
@@ -461,6 +478,7 @@ async function updateUserXP(xpGain) {
     try {
         const res = await conectarConServidorRender(
             "/api/user/update-xp?xp_gain=" + xpGain,
+            "POST",
         );
         if (res.ok) {
             await fetchUserStats();
@@ -1710,7 +1728,7 @@ function renderScenariosGrid(scenarios) {
             const safeId = escapeAttr(sc.id);
             const safeTitle = escapeHtml(sc.title);
             const safeDesc = escapeHtml(sc.description);
-            const safeIcon = escapeAttr(sc.icon);
+            const safeIcon = escapeAttr(normalizeFaIcon(sc.icon));
 
             return `
             <div data-action="start-roleplay"
@@ -1746,6 +1764,12 @@ function startRoleplaySession(scenarioId) {
     document.getElementById("rp-active-title").innerText = sc.title;
     document.getElementById("rp-active-role").innerText =
         `Interlocutor: ${sc.role}`;
+
+    // Sincronizar el icono del header con el del escenario
+    const headerIcon = document.getElementById("rp-active-icon");
+    if (headerIcon) {
+        headerIcon.className = `${normalizeFaIcon(sc.icon)} text-2xl`;
+    }
 
     const messagesContainer = document.getElementById("rp-messages");
     messagesContainer.innerHTML = "";
@@ -1915,7 +1939,6 @@ async function sendRoleplayMessage(e) {
         }
 
         appendRPMessage("user", userText);
-        roleplayHistory.push({ role: "user", content: userText });
         input.value = "";
 
         const res = await apiFetch("/api/roleplay/respond", {
@@ -1933,12 +1956,11 @@ async function sendRoleplayMessage(e) {
 
         if (res.ok) {
             const data = await res.json();
+            roleplayHistory.push({ role: "user", content: userText });       // ← push aquí
+            roleplayHistory.push({ role: "assistant", content: data.bot_reply });
+            if (roleplayHistory.length > 20) roleplayHistory = roleplayHistory.slice(-20);
             appendRPMessage("bot", data.bot_reply, data.feedback);
             playNaturalAudio(data.bot_reply);
-            roleplayHistory.push({
-                role: "assistant",
-                content: data.bot_reply,
-            });
             updateUserXP(10);
         } else {
             console.error("Error Roleplay: respuesta no OK", res.status);
@@ -2499,4 +2521,22 @@ async function apiFetch(path, options = {}) {
     } finally {
         clearTimeout(timeoutId);
     }
+}
+
+// Normaliza clases de Font Awesome 6.
+// Acepta "mug-hot", "fa-mug-hot" o "fa-solid fa-mug-hot" y devuelve siempre la forma correcta.
+function normalizeFaIcon(iconRaw) {
+    const icon = String(iconRaw ?? "").trim();
+    if (!icon) return "fa-solid fa-circle";
+
+    // Ya tiene prefijo de estilo → lo respetamos tal cual
+    if (/^fa-(solid|regular|brands|light|thin|duotone)\b/.test(icon)) {
+        return icon;
+    }
+    // Empieza por "fa-" pero sin estilo (ej. "fa-mug-hot")
+    if (icon.startsWith("fa-")) {
+        return `fa-solid ${icon}`;
+    }
+    // Viene solo el nombre del icono (ej. "mug-hot")
+    return `fa-solid fa-${icon}`;
 }
