@@ -2,6 +2,8 @@
 // LinguaBoost Pro - Frontend Application Engine (v4.6)
 // ==========================================
 
+const DEBUG_MODE = true; // Cambiar a true para ver logs detallados en la consola
+
 // ============================================================
 // GESTIÓN DEL COLD START DE RENDER
 // ============================================================
@@ -149,7 +151,9 @@ function setBackendStatus(status) {
     banner.innerHTML = `<i class="${cfg.icon} ${cfg.iconAnim}"></i><span>${cfg.text}</span>`;
 
     if (status === "ready") {
-        setTimeout(() => { banner.style.display = "none"; }, 2000);
+        setTimeout(() => {
+            banner.style.display = "none";
+        }, 2000);
     }
 }
 
@@ -158,6 +162,10 @@ function setBackendStatus(status) {
  * Si falla, marca 'waking' y reintenta hasta 90 s (cold start típico).
  */
 async function wakeUpBackend(timeoutMs = 90000) {
+    if (DEBUG_MODE) {
+        console.log("[WARMUP] llamada. status:", backendStatus, "promise:", !!warmupPromise);
+    }
+
     if (backendStatus === "ready") return true;
     if (warmupPromise) return warmupPromise;
 
@@ -167,6 +175,10 @@ async function wakeUpBackend(timeoutMs = 90000) {
         const started = Date.now();
         // Reintentos progresivos mientras esté por debajo del timeout
         while (Date.now() - started < timeoutMs) {
+            if (DEBUG_MODE) {
+                console.log("[WARMUP] intentando fetch a", `${API_BASE_URL}/`);
+            }
+
             try {
                 const ctrl = new AbortController();
                 const t = setTimeout(() => ctrl.abort(), 15000);
@@ -176,13 +188,19 @@ async function wakeUpBackend(timeoutMs = 90000) {
                     cache: "no-store",
                 });
                 clearTimeout(t);
+                if (DEBUG_MODE) {
+                    console.log("[WARMUP] respuesta:", res.status);
+                }
                 if (res.ok || res.status < 500) {
                     setBackendStatus("ready");
                     backendStatus = "ready";
                     return true;
                 }
-            } catch (_) {
+            } catch (err) {
                 // aún no despierta: esperamos 3 s y reintentamos
+                if (DEBUG_MODE) {
+                    console.warn("[WARMUP] intento falló:", err.name, err.message);
+                }
                 await new Promise((r) => setTimeout(r, 3000));
             }
         }
@@ -197,19 +215,39 @@ async function wakeUpBackend(timeoutMs = 90000) {
     }
 }
 
-console.log("[BOOT] app.js cargado");
+if (DEBUG_MODE) {
+    console.log("[BOOT] app.js cargado");
+}
 
 // --- INICIALIZACIÓN ---
 document.addEventListener("DOMContentLoaded", async () => {
+    if (DEBUG_MODE) {
+       console.log("[BOOT] DOMContentLoaded");
+    }
+
     initDarkMode();
     setupSpeechRecognition();
     registerGlobalDelegatedListeners();
+    if (DEBUG_MODE) {
+       console.log("[BOOT] listeners registrados");
+    }
 
     // 🔥 Despertamos el backend en paralelo mientras el usuario ve el login
-    wakeUpBackend().catch(() => {});
+    if (DEBUG_MODE) {
+       console.log("[BOOT] lanzando wakeUpBackend...");
+    }
+    wakeUpBackend()
+        .then((ok) => console.log("[WARMUP] terminó con:", ok))
+        .catch((e) => console.error("[WARMUP] error:", e));
 
     // Verificación y restauración automática de sesión con Supabase
+    if (DEBUG_MODE) {
+       console.log("[BOOT] lanzando checkAutoLogin...");
+    }
     await checkAutoLogin();
+    if (DEBUG_MODE) {
+        console.log("[BOOT] checkAutoLogin terminado");
+    }
 
     // Event listener para el textarea de writing
     const writingInput = document.getElementById("writing-input");
@@ -567,7 +605,9 @@ async function fetchDailyChallenge() {
                         </button>
                     </div>
                     <p class="text-slate-800 dark:text-slate-100 font-medium ${
-                        isCompleted ? "line-through text-slate-500 dark:text-slate-400" : ""
+                        isCompleted
+                            ? "line-through text-slate-500 dark:text-slate-400"
+                            : ""
                     }">${safeText}</p>
                 </div>`;
             })
@@ -583,7 +623,8 @@ async function completeMission(missionId, btnElement) {
 
     if (btnElement) {
         btnElement.disabled = true;
-        btnElement.innerHTML = '<span class="material-symbols-outlined text-[14px] animate-spin">progress_activity</span>';
+        btnElement.innerHTML =
+            '<span class="material-symbols-outlined text-[14px] animate-spin">progress_activity</span>';
     }
 
     try {
@@ -881,16 +922,13 @@ async function startRecording() {
             formData.append("target_text", currentUnit ? currentUnit.text : "");
 
             try {
-                const res = await apiFetch(
-                    "/api/evaluate-reading",
-                    {
-                        headers: {
-                            Authorization: `Bearer ${authToken}`, // Enviando token al backend
-                        },
-                        method: "POST",
-                        body: formData,
+                const res = await apiFetch("/api/evaluate-reading", {
+                    headers: {
+                        Authorization: `Bearer ${authToken}`, // Enviando token al backend
                     },
-                );
+                    method: "POST",
+                    body: formData,
+                });
                 if (res.ok) {
                     const data = await res.json();
                     displayReadingResults(data);
@@ -1254,7 +1292,7 @@ async function conectarConServidorRender(
     method = "GET",
     body = null,
     showLoading = false,
-    ) {
+) {
     if (!authToken) {
         console.error("No hay token de autenticación.");
         showLoginModal();
@@ -1283,7 +1321,8 @@ async function conectarConServidorRender(
 
     try {
         const headers = { Authorization: `Bearer ${authToken}` };
-        if (body && method !== "GET") headers["Content-Type"] = "application/json";
+        if (body && method !== "GET")
+            headers["Content-Type"] = "application/json";
 
         const config = { method, headers };
         if (body && method !== "GET") config.body = JSON.stringify(body);
@@ -1422,7 +1461,8 @@ const IPA_TYPE_COLORS = {
         "bg-indigo-100 text-indigo-800 dark:bg-indigo-900/50 dark:text-indigo-300",
 };
 
-const IPA_TYPE_DEFAULT_COLOR = "bg-slate-100 text-slate-700 dark:bg-slate-700 dark:text-slate-300";
+const IPA_TYPE_DEFAULT_COLOR =
+    "bg-slate-100 text-slate-700 dark:bg-slate-700 dark:text-slate-300";
 
 function renderPhonemeCategory(containerId, items) {
     const grid = document.getElementById(containerId);
@@ -1433,19 +1473,24 @@ function renderPhonemeCategory(containerId, items) {
             const truncate = (str, max) =>
                 str.length > max ? str.slice(0, max) + "…" : str;
 
-            const example     = escapeHtml(item.example);
-            const symbol      = escapeHtml(item.symbol);
-            const ipaEx       = escapeHtml(item.ipa_ex);
-            const type        = escapeHtml(item.type);
-            const shortHint   = escapeHtml(truncate(item.spanish_equivalent_or_hack, 300));
-            const shortError  = escapeHtml(truncate(item.common_error_spanish, 300));
-            const hintFull    = escapeHtml(item.spanish_equivalent_or_hack);
-            const errorFull   = escapeHtml(item.common_error_spanish);
-            const pairs       = escapeHtml(item.minimal_pairs.join(" · "));
-            const pairsFull   = escapeHtml(item.minimal_pairs.join("; "));
-            const spellings   = item.common_spellings.map(escapeHtml);
-            const typeColor   = IPA_TYPE_COLORS[item.type] || IPA_TYPE_DEFAULT_COLOR;
-            const cardId      = makeSafeId(`${containerId}-${index}`);
+            const example = escapeHtml(item.example);
+            const symbol = escapeHtml(item.symbol);
+            const ipaEx = escapeHtml(item.ipa_ex);
+            const type = escapeHtml(item.type);
+            const shortHint = escapeHtml(
+                truncate(item.spanish_equivalent_or_hack, 300),
+            );
+            const shortError = escapeHtml(
+                truncate(item.common_error_spanish, 300),
+            );
+            const hintFull = escapeHtml(item.spanish_equivalent_or_hack);
+            const errorFull = escapeHtml(item.common_error_spanish);
+            const pairs = escapeHtml(item.minimal_pairs.join(" · "));
+            const pairsFull = escapeHtml(item.minimal_pairs.join("; "));
+            const spellings = item.common_spellings.map(escapeHtml);
+            const typeColor =
+                IPA_TYPE_COLORS[item.type] || IPA_TYPE_DEFAULT_COLOR;
+            const cardId = makeSafeId(`${containerId}-${index}`);
 
             return `
             <div class="phoneme-card group bg-white dark:bg-slate-800 rounded-2xl shadow-sm hover:shadow-lg
@@ -1468,9 +1513,12 @@ function renderPhonemeCategory(containerId, items) {
                 <div class="mt-1 text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">${type}</div>
 
                 <div class="mt-3 flex flex-wrap gap-1.5">
-                    ${spellings.map((sp) =>
-                        `<span class="px-2.5 py-0.5 bg-cyan-100 dark:bg-cyan-900/40 text-cyan-800 dark:text-cyan-300 text-[11px] rounded-full font-mono border border-cyan-200 dark:border-cyan-800">${sp}</span>`
-                    ).join("")}
+                    ${spellings
+                        .map(
+                            (sp) =>
+                                `<span class="px-2.5 py-0.5 bg-cyan-100 dark:bg-cyan-900/40 text-cyan-800 dark:text-cyan-300 text-[11px] rounded-full font-mono border border-cyan-200 dark:border-cyan-800">${sp}</span>`,
+                        )
+                        .join("")}
                 </div>
 
                 <div class="mt-3 text-xs text-slate-600 dark:text-slate-300">
@@ -1540,7 +1588,6 @@ function toggleDetails(btn) {
 
 function registerGlobalDelegatedListeners() {
     document.addEventListener("click", (e) => {
-
         // ─── 1. Reproducir audio de vocabulario / fonema / palabra ───
         const audioTrigger = e.target.closest("[data-action='play-audio']");
         if (audioTrigger) {
@@ -1611,7 +1658,9 @@ function registerGlobalDelegatedListeners() {
         }
 
         // ─── 7. Usar sugerencia de roleplay ───
-        const suggestionBtn = e.target.closest("[data-action='use-suggestion']");
+        const suggestionBtn = e.target.closest(
+            "[data-action='use-suggestion']",
+        );
         if (suggestionBtn) {
             e.preventDefault();
             e.stopPropagation();
@@ -1997,11 +2046,13 @@ function renderPlacementQuestion(data) {
         `Dificultad: ${escapeHtml(data.level)}`;
     document.getElementById("pt-progress-bar").style.width =
         `${(data.step / data.total_steps) * 100}%`;
-    document.getElementById("pt-question-text").innerText = data.question.question;
+    document.getElementById("pt-question-text").innerText =
+        data.question.question;
 
     const optionsContainer = document.getElementById("pt-options-container");
     optionsContainer.innerHTML = data.question.options
-        .map((opt, idx) => `
+        .map(
+            (opt, idx) => `
             <button type="button"
                     data-action="pt-select-option"
                     data-option-index="${idx}"
@@ -2012,7 +2063,8 @@ function renderPlacementQuestion(data) {
                 <span class="font-bold text-amber-600 dark:text-amber-400 mr-2">${String.fromCharCode(65 + idx)}.</span>
                 ${escapeHtml(opt)}
             </button>
-        `)
+        `,
+        )
         .join("");
 
     const nextBtn = document.getElementById("pt-next-btn");
@@ -2178,7 +2230,9 @@ async function renderCurriculum() {
                             .map((unit) => {
                                 const safeUnitId = escapeAttr(unit.id);
                                 const safeTitle = escapeHtml(unit.title);
-                                const safeGrammar = escapeHtml(unit.grammar_focus);
+                                const safeGrammar = escapeHtml(
+                                    unit.grammar_focus,
+                                );
                                 return `
                                 <div data-action="load-unit"
                                      data-unit-id="${safeUnitId}"
@@ -2399,7 +2453,7 @@ function updateNavUserProfile(username, level = "A1") {
 function showLoadingAlert(
     title = "Procesando...",
     text = "Por favor espera mientras el servidor responde.",
-    ) {
+) {
     Swal.fire({
         title: title,
         text: text,
@@ -2428,7 +2482,10 @@ async function apiFetch(path, options = {}) {
     const ext = options.signal;
     if (ext) {
         if (ext.aborted) controller.abort();
-        else ext.addEventListener("abort", () => controller.abort(), { once: true });
+        else
+            ext.addEventListener("abort", () => controller.abort(), {
+                once: true,
+            });
     }
 
     try {
@@ -2443,4 +2500,3 @@ async function apiFetch(path, options = {}) {
         clearTimeout(timeoutId);
     }
 }
-
