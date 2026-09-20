@@ -104,7 +104,7 @@ function setBackendStatus(status) {
             border: "#fcd34d",
             icon: "fa-solid fa-server",
             iconAnim: "fa-spin",
-            text: "El servidor está despertando… (hasta 60 s en la primera carga)",
+            text: "Estamos preparando el servidor. Esto puede tardar unos segundos...",
         },
         ready: {
             bg: "#d1fae5",
@@ -112,7 +112,7 @@ function setBackendStatus(status) {
             border: "#6ee7b7",
             icon: "fa-solid fa-circle-check",
             iconAnim: "",
-            text: "Servidor listo",
+            text: "Servidor preparado y listo para usar.",
         },
         down: {
             bg: "#fee2e2",
