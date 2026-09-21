@@ -44,6 +44,18 @@ let userStats = {};
 let progressChart = null;
 let roleplayHistory = [];
 let roleplayScenariosMap = {};
+// Variable global para poder detener el audio actual desde cualquier parte
+let currentAudioElement = null;
+// Estado del Shadowing (necesario para controlar la secuencia)
+let shadowingState = {
+    running: false,
+    abort: false,
+    sentences: [],
+    index: 0,
+    pauseMs: 4000,
+    rate: "-15%",
+    currentFinish: null, // para resolver la Promise de audio cuando se detiene manualmente
+};
 
 let ptState = {
     currentLevel: "A2",
@@ -797,6 +809,18 @@ function renderCurrentUnit() {
     if (results) results.classList.add("hidden");
 }
 
+function stopCurrentAudio() {
+    if (currentAudioElement) {
+        try {
+            currentAudioElement.pause();
+            currentAudioElement.currentTime = 0;
+        } catch (e) { /* noop */ }
+        currentAudioElement = null;
+    }
+    try { window.speechSynthesis.cancel(); } catch (e) { /* noop */ }
+    processing.audio = false;
+}
+
 // --- AUDIO SÍNTESIS CON BLOQUEO Y SWEETALERT2 ---
 function playNaturalAudio(text, voice = "en-US-AriaNeural") {
     if (!text || processing.audio) return;
@@ -1231,49 +1255,259 @@ async function analyzeWriting(e) {
     }
 }
 
-// --- SHADOWING ---
-function startShadowingRoutine() {
-    if (processing.shadowing) return;
+// --- SHADOWING (v2: secuencia correcta, pausa adaptativa, controles) ---
+
+/**
+ * Divide un texto en oraciones usando . ! ? como separadores.
+ */
+function splitIntoSentences(text) {
+    if (!text) return [];
+    const cleaned = text.replace(/\s+/g, " ").trim();
+    const parts = cleaned.match(/[^.!?]+[.!?]+/g);
+    if (!parts || parts.length === 0) return [cleaned];
+    return parts.map((s) => s.trim()).filter((s) => s.length > 0);
+}
+
+/**
+ * Espera `ms` ms pero se cancela inmediatamente si `shadowingState.abort` es true.
+ */
+function waitWithAbort(ms) {
+    return new Promise((resolve) => {
+        const start = Date.now();
+        const tick = () => {
+            if (shadowingState.abort) return resolve();
+            if (Date.now() - start >= ms) return resolve();
+            setTimeout(tick, 100);
+        };
+        tick();
+    });
+}
+
+/**
+ * Tiempo de repetición adaptado a la longitud de la frase.
+ * Mínimo 3.5 s o ~700 ms por palabra (lo que sea mayor).
+ */
+function computePauseMs(sentence) {
+    const words = sentence.split(/\s+/).filter(Boolean).length;
+    const basePause = Math.max(3500, words * 700);
+    return Math.max(basePause, shadowingState.pauseMs);
+}
+
+/**
+ * Reproduce un audio SIN mostrar SweetAlert de carga (específico para Shadowing).
+ * Devuelve una Promise que se resuelve cuando termina o cuando se cancela.
+ */
+function playShadowingAudio(text, rate = "-15%") {
+    return new Promise((resolve) => {
+        if (!text) return resolve(false);
+
+        // Detener cualquier audio previo
+        stopCurrentAudio();
+        processing.audio = true;
+
+        const audioUrl = `${API_BASE_URL}/api/tts-natural?text=${encodeURIComponent(
+            text,
+        )}&rate=${encodeURIComponent(rate)}`;
+        const audio = new Audio(audioUrl);
+        currentAudioElement = audio;
+
+        let resolved = false;
+        const finish = (ok) => {
+            if (resolved) return;
+            resolved = true;
+            if (currentAudioElement === audio) currentAudioElement = null;
+            if (shadowingState.currentFinish === finish) {
+                shadowingState.currentFinish = null;
+            }
+            processing.audio = false;
+            resolve(ok);
+        };
+
+        // Guardamos referencia para poder resolver la Promise desde stopShadowingRoutine
+        shadowingState.currentFinish = finish;
+
+        audio.onended = () => finish(true);
+
+        audio.onerror = () => {
+            // Fallback al sintetizador del navegador
+            window.speechSynthesis.cancel();
+            const utterance = new SpeechSynthesisUtterance(text);
+            utterance.lang = "en-US";
+            utterance.rate = 0.85;
+            utterance.onend = () => finish(true);
+            utterance.onerror = () => finish(false);
+            window.speechSynthesis.speak(utterance);
+        };
+
+        audio.play().catch(() => {
+            window.speechSynthesis.cancel();
+            const utterance = new SpeechSynthesisUtterance(text);
+            utterance.lang = "en-US";
+            utterance.rate = 0.85;
+            utterance.onend = () => finish(true);
+            utterance.onerror = () => finish(false);
+            window.speechSynthesis.speak(utterance);
+        });
+    });
+}
+
+/**
+ * Pinta en pantalla la frase actual + el estado (escuchando / repite).
+ */
+function renderShadowingStep(sentence, index, total, phase) {
+    const display = document.getElementById("shadowing-display");
+    if (!display) return;
+
+    const phaseLabel =
+        phase === "listen"
+            ? '<span class="text-xs font-bold text-indigo-600 dark:text-indigo-400 uppercase tracking-wider flex items-center gap-1"><span class="material-symbols-outlined text-[14px]">volume_up</span> Escuchando…</span>'
+            : '<span class="text-xs font-bold text-emerald-600 dark:text-emerald-400 uppercase tracking-wider flex items-center gap-1"><span class="material-symbols-outlined text-[14px]">mic</span> Repite ahora</span>';
+
+    const hint =
+        phase === "listen"
+            ? "Escucha con atención la entonación y el ritmo."
+            : "Repite la frase en voz alta imitando al hablante.";
+
+    display.innerHTML = `
+        <div class="flex items-center justify-between mb-3">
+            <span class="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
+                Frase ${index + 1} de ${total}
+            </span>
+            ${phaseLabel}
+        </div>
+        <p class="text-lg font-medium text-slate-800 dark:text-slate-100 mb-2">${escapeHtml(sentence)}</p>
+        <p class="text-sm text-slate-500 dark:text-slate-400 italic">${hint}</p>
+        <div class="mt-3 w-full bg-slate-200 dark:bg-slate-700 h-1.5 rounded-full overflow-hidden">
+            <div class="bg-indigo-600 h-1.5 transition-all duration-300"
+                 style="width: ${((index + 1) / total) * 100}%"></div>
+        </div>
+    `;
+}
+
+/**
+ * Reproduce UNA frase completa y espera a que el alumno la repita.
+ */
+async function playShadowingStep(sentence, index, total) {
+    renderShadowingStep(sentence, index, total, "listen");
+    await playShadowingAudio(sentence, shadowingState.rate);
+    if (shadowingState.abort) return;
+    renderShadowingStep(sentence, index, total, "repeat");
+    await waitWithAbort(computePauseMs(sentence));
+}
+
+async function startShadowingRoutine() {
+    if (shadowingState.running) return;
+
+    if (!currentUnit) {
+        Swal.fire({
+            icon: "warning",
+            title: "Sin texto",
+            text: "Selecciona una lectura antes de iniciar el Shadowing.",
+            confirmButtonColor: "#4f46e5",
+        });
+        return;
+    }
+
+    const sentences = splitIntoSentences(currentUnit.text);
+    if (sentences.length === 0) {
+        Swal.fire({
+            icon: "warning",
+            title: "Texto vacío",
+            text: "No hay oraciones para practicar.",
+            confirmButtonColor: "#4f46e5",
+        });
+        return;
+    }
+
+    // Leer controles del usuario
+    const speedSelect = document.getElementById("shadowing-speed");
+    const pauseSelect = document.getElementById("shadowing-pause");
+
+    shadowingState = {
+        running: true,
+        abort: false,
+        sentences,
+        index: 0,
+        rate: speedSelect ? speedSelect.value : "-15%",
+        pauseMs: pauseSelect ? parseInt(pauseSelect.value, 10) : 4000,
+        currentFinish: null,
+    };
     processing.shadowing = true;
+
     const btn = document.getElementById("btn-shadowing");
-    btn.disabled = true;
-    btn.classList.add("opacity-50", "cursor-not-allowed");
-    btn.innerHTML =
-        '<i class="fa-solid fa-spinner fa-spin"></i> Reproduciendo...';
+    const stopBtn = document.getElementById("btn-shadowing-stop");
+
+    if (btn) {
+        btn.disabled = true;
+        btn.classList.add("opacity-50", "cursor-not-allowed");
+        btn.innerHTML =
+            '<i class="fa-solid fa-spinner fa-spin"></i> En curso…';
+    }
+    if (stopBtn) stopBtn.classList.remove("hidden");
 
     try {
-        if (!currentUnit) return;
-        const sentences = currentUnit.text.match(/[^.!?]+[.!?]+/g) || [
-            currentUnit.text,
-        ];
-        let index = 0;
+        for (let i = 0; i < sentences.length; i++) {
+            if (shadowingState.abort) break;
+            shadowingState.index = i;
+            await playShadowingStep(sentences[i], i, sentences.length);
+        }
+    } catch (e) {
+        console.error("[Shadowing] error:", e);
+    } finally {
+        const aborted = shadowingState.abort;
+        const totalSentences = shadowingState.sentences.length;
 
-        function playNextSentence() {
-            if (index < sentences.length) {
-                const current = sentences[index].trim();
-                const display = document.getElementById("shadowing-display");
-                if (display) display.innerText = current;
-                playNaturalAudio(current);
-                index++;
-                setTimeout(playNextSentence, 4500);
+        shadowingState.running = false;
+        shadowingState.abort = false;
+        shadowingState.currentFinish = null;
+        processing.shadowing = false;
+
+        if (btn) {
+            btn.disabled = false;
+            btn.classList.remove("opacity-50", "cursor-not-allowed");
+            btn.innerHTML =
+                '<i class="fa-solid fa-play"></i> Iniciar Rutina de Shadowing';
+        }
+        if (stopBtn) stopBtn.classList.add("hidden");
+
+        const display = document.getElementById("shadowing-display");
+        if (display) {
+            if (aborted) {
+                display.innerHTML = `
+                    <p class="text-slate-600 dark:text-slate-300 font-medium">
+                        Rutina detenida. Puedes reiniciarla cuando quieras.
+                    </p>`;
             } else {
-                // Restaurar botón al finalizar
-                processing.shadowing = false;
-                btn.disabled = false;
-                btn.classList.remove("opacity-50", "cursor-not-allowed");
-                btn.innerHTML =
-                    '<i class="fa-solid fa-play"></i> Iniciar Rutina de Shadowing';
+                display.innerHTML = `
+                    <div class="text-center">
+                        <span class="material-symbols-outlined text-emerald-500" style="font-size:3rem;">check_circle</span>
+                        <p class="text-emerald-700 dark:text-emerald-300 font-bold mt-1">
+                            ¡Rutina completada! Excelente trabajo.
+                        </p>
+                        <p class="text-sm text-slate-500 dark:text-slate-400 mt-1">
+                            Practicaste ${totalSentences} ${totalSentences === 1 ? "frase" : "frases"}.
+                        </p>
+                    </div>`;
             }
         }
-        playNextSentence();
-    } catch (e) {
-        console.error(e);
-        processing.shadowing = false;
-        btn.disabled = false;
-        btn.classList.remove("opacity-50", "cursor-not-allowed");
-        btn.innerHTML =
-            '<i class="fa-solid fa-play"></i> Iniciar Rutina de Shadowing';
     }
+}
+
+function stopShadowingRoutine() {
+    if (!shadowingState.running) return;
+    shadowingState.abort = true;
+
+    // Resolver la Promise de audio pendiente para desbloquear el bucle for
+    if (shadowingState.currentFinish) {
+        try {
+            shadowingState.currentFinish(false);
+        } catch (e) {
+            /* noop */
+        }
+        shadowingState.currentFinish = null;
+    }
+
+    stopCurrentAudio();
 }
 
 // --- REPETICIÓN ESPACIADA (SRS) ---

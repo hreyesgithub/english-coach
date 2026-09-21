@@ -448,29 +448,48 @@
                 <div id="writing-results" class="hidden mt-6 space-y-4"></div>
             </section>
 
-            <!-- SECCIÓN 4: SHADOWING -->
-            <section
-                id="sec-shadowing"
-                class="tab-content hidden bg-white dark:bg-slate-800 p-6 md:p-8 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-700">
-                <h2
-                    class="text-xl font-bold text-slate-800 dark:text-slate-100 mb-2">
-                    Entrenamiento por Shadowing
-                </h2>
+           <!-- SECCIÓN 4: SHADOWING -->
+            <section id="sec-shadowing" class="tab-content hidden bg-white dark:bg-slate-800 p-6 md:p-8 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-700">
+                <h2 class="text-xl font-bold text-slate-800 dark:text-slate-100 mb-2">Entrenamiento por Shadowing</h2>
                 <p class="text-sm text-slate-600 dark:text-slate-300 mb-6">
-                    La técnica de Shadowing consiste en repetir las oraciones
-                    inmediatamente después de escucharlas para mejorar
-                    entonación y fluidez.
+                    Escucha cada frase completa y repítela en voz alta. La pausa se adapta a la longitud de la oración.
                 </p>
-                <button
-                    id="btn-shadowing"
-                    onclick="startShadowingRoutine()"
-                    class="bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-3 rounded-lg font-bold shadow-sm transition mb-6">
-                    <i class="fa-solid fa-play"></i>
-                    Iniciar Rutina de Shadowing
-                </button>
-                <div
-                    id="shadowing-display"
-                    class="p-6 bg-slate-50 dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-100 text-lg font-medium">
+
+                <!-- Controles -->
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
+                    <label class="block">
+                        <span class="text-xs font-bold uppercase tracking-wider text-slate-600 dark:text-slate-400">Velocidad del audio</span>
+                        <select id="shadowing-speed" class="mt-1 w-full border border-slate-300 dark:border-slate-600 rounded-lg p-2.5 text-sm bg-white dark:bg-slate-700 text-slate-800 dark:text-slate-100 font-medium focus:ring-2 focus:ring-indigo-500">
+                            <option value="-25%">Muy lento (-25%)</option>
+                            <option value="-15%" selected>Lento (-15%) — recomendado</option>
+                            <option value="-8%">Normal (-8%)</option>
+                            <option value="+0%">Rápido (nativo)</option>
+                        </select>
+                    </label>
+
+                    <label class="block">
+                        <span class="text-xs font-bold uppercase tracking-wider text-slate-600 dark:text-slate-400">Tiempo para repetir</span>
+                        <select id="shadowing-pause" class="mt-1 w-full border border-slate-300 dark:border-slate-600 rounded-lg p-2.5 text-sm bg-white dark:bg-slate-700 text-slate-800 dark:text-slate-100 font-medium focus:ring-2 focus:ring-indigo-500">
+                            <option value="3000">Corto (3 s)</option>
+                            <option value="4000" selected>Medio (4 s)</option>
+                            <option value="6000">Largo (6 s)</option>
+                            <option value="8000">Muy largo (8 s)</option>
+                        </select>
+                    </label>
+                </div>
+
+                <div class="flex flex-wrap gap-3 mb-6">
+                    <button id="btn-shadowing" onclick="startShadowingRoutine()"
+                            class="bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-3 rounded-lg font-bold shadow-sm transition flex items-center gap-2">
+                        <i class="fa-solid fa-play"></i> Iniciar Rutina de Shadowing
+                    </button>
+                    <button id="btn-shadowing-stop" onclick="stopShadowingRoutine()"
+                            class="hidden bg-rose-600 hover:bg-rose-700 text-white px-6 py-3 rounded-lg font-bold shadow-sm transition flex items-center gap-2">
+                        <span class="material-symbols-outlined text-[18px]">stop</span> Detener
+                    </button>
+                </div>
+
+                <div id="shadowing-display" class="p-6 bg-slate-50 dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-100 text-lg font-medium">
                     Presiona el botón para iniciar la reproducción por frases.
                 </div>
             </section>
