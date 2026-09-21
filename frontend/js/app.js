@@ -2,7 +2,7 @@
 // LinguaBoost Pro - Frontend Application Engine (v4.6)
 // ==========================================
 
-const DEBUG_MODE = false; // Cambiar a true para ver logs detallados en la consola
+const DEBUG_MODE = true; // Cambiar a true para ver logs detallados en la consola
 
 // ============================================================
 // GESTIÓN DEL COLD START DE RENDER
@@ -1299,6 +1299,24 @@ function splitIntoSentences(text) {
     return parts.map((s) => s.trim()).filter((s) => s.length > 0);
 }
 
+// "Desbloquea" la reproducción de audio en el primer gesto del usuario.
+// Reproduce un WAV silencioso de 1 muestra: si el navegador lo permite,
+// a partir de ahí permitirá reproducir audios aunque no haya gesto directo.
+async function unlockAudioPlayback() {
+    try {
+        const silent = new Audio(
+            "data:audio/wav;base64,UklGRigAAABXQVZFZm10IBIAAAABAAEARKwAAIhYAQACABAAAABkYXRhAgAAAAEA",
+        );
+        silent.volume = 0;
+        await silent.play();
+        if (DEBUG_MODE) console.log("[Shadowing] audio desbloqueado ✔");
+    } catch (e) {
+        if (DEBUG_MODE) {
+            console.warn("[Shadowing] no se pudo desbloquear audio:", e && e.name);
+        }
+    }
+}
+
 // --- Timing ---
 function waitWithAbort(ms) {
     return new Promise((resolve) => {
@@ -1318,7 +1336,7 @@ function computePauseMs(sentence) {
     return Math.max(basePause, shadowingState.pauseMs);
 }
 
-// --- Audio (sin SweetAlert, espera al 'ended') ---
+// --- Audio (sin SweetAlert, con precarga, logs y timeout) ---
 function playShadowingAudio(text, rate = "-15%") {
     return new Promise((resolve) => {
         if (!text) return resolve(false);
@@ -1329,13 +1347,23 @@ function playShadowingAudio(text, rate = "-15%") {
         const audioUrl = `${API_BASE_URL}/api/tts-natural?text=${encodeURIComponent(
             text,
         )}&rate=${encodeURIComponent(rate)}`;
-        const audio = new Audio(audioUrl);
+
+        if (DEBUG_MODE) {
+            console.log("[Shadowing] ▶ playShadowingAudio:", { text, rate, audioUrl });
+        }
+
+        const audio = new Audio();
+        audio.preload = "auto";
+        audio.src = audioUrl;
         currentAudioElement = audio;
 
         let resolved = false;
-        const finish = (ok) => {
+        const finish = (ok, reason = "") => {
             if (resolved) return;
             resolved = true;
+            if (DEBUG_MODE) {
+                console.log(`[Shadowing] ■ audio finish -> ${reason} (ok=${ok})`);
+            }
             if (currentAudioElement === audio) currentAudioElement = null;
             if (shadowingState.currentAudioFinish === finish) {
                 shadowingState.currentAudioFinish = null;
@@ -1346,26 +1374,114 @@ function playShadowingAudio(text, rate = "-15%") {
 
         shadowingState.currentAudioFinish = finish;
 
-        audio.onended = () => finish(true);
-        audio.onerror = () => {
-            window.speechSynthesis.cancel();
-            const u = new SpeechSynthesisUtterance(text);
-            u.lang = "en-US";
-            u.rate = 0.85;
-            u.onend = () => finish(true);
-            u.onerror = () => finish(false);
-            window.speechSynthesis.speak(u);
+        // Timeout de seguridad: si el audio no termina en un tiempo razonable, avanzamos
+        const estimatedMs = Math.max(4000, text.length * 90);
+        const safetyTimeout = setTimeout(() => {
+            if (DEBUG_MODE) {
+                console.warn(
+                    "[Shadowing] ⏱ safety-timeout tras",
+                    estimatedMs + 8000,
+                    "ms",
+                );
+            }
+            finish(false, "safety-timeout");
+        }, estimatedMs + 8000);
+        const clearSafety = () => clearTimeout(safetyTimeout);
+
+        audio.onloadedmetadata = () => {
+            if (DEBUG_MODE) {
+                console.log(
+                    "[Shadowing] metadata cargada, duración:",
+                    audio.duration,
+                    "s",
+                );
+            }
         };
-        audio.play().catch(() => {
-            window.speechSynthesis.cancel();
-            const u = new SpeechSynthesisUtterance(text);
-            u.lang = "en-US";
-            u.rate = 0.85;
-            u.onend = () => finish(true);
-            u.onerror = () => finish(false);
-            window.speechSynthesis.speak(u);
+
+        audio.oncanplaythrough = () => {
+            if (DEBUG_MODE) console.log("[Shadowing] canplaythrough ✔");
+        };
+
+        audio.onplay = () => {
+            if (DEBUG_MODE) console.log("[Shadowing] evento onplay ✔");
+        };
+
+        audio.onended = () => {
+            clearSafety();
+            finish(true, "ended");
+        };
+
+        audio.onerror = () => {
+            clearSafety();
+            if (DEBUG_MODE) {
+                console.warn(
+                    "[Shadowing] audio.onerror:",
+                    audio.error && audio.error.code,
+                    audio.error && audio.error.message,
+                );
+            }
+            fallbackToSpeechSynthesis(text, finish);
+        };
+
+        audio.play().catch((err) => {
+            clearSafety();
+            if (DEBUG_MODE) {
+                console.warn(
+                    "[Shadowing] play() rechazado:",
+                    err && err.name,
+                    err && err.message,
+                );
+            }
+            fallbackToSpeechSynthesis(text, finish);
         });
     });
+}
+
+// --- Fallback robusto con su propio timeout ---
+function fallbackToSpeechSynthesis(text, finishFn) {
+    try {
+        window.speechSynthesis.cancel();
+    } catch (e) {
+        /* noop */
+    }
+
+    if (!("speechSynthesis" in window)) {
+        if (DEBUG_MODE) console.warn("[Shadowing] Sin speechSynthesis → finish(false)");
+        finishFn(false, "no-speech-api");
+        return;
+    }
+
+    const u = new SpeechSynthesisUtterance(text);
+    u.lang = "en-US";
+    u.rate = 0.85;
+
+    let done = false;
+    const fbFinish = (ok, reason) => {
+        if (done) return;
+        done = true;
+        finishFn(ok, reason);
+    };
+
+    const estimatedMs = Math.max(4000, text.length * 100);
+    setTimeout(() => fbFinish(false, "speech-timeout"), estimatedMs + 5000);
+
+    u.onstart = () => {
+        if (DEBUG_MODE) console.log("[Shadowing] speechSynthesis onstart ✔");
+    };
+    u.onend = () => fbFinish(true, "speech-ended");
+    u.onerror = (e) => {
+        if (DEBUG_MODE) {
+            console.warn("[Shadowing] speechSynthesis onerror:", e.error);
+        }
+        fbFinish(false, "speech-error");
+    };
+
+    try {
+        window.speechSynthesis.speak(u);
+    } catch (e) {
+        if (DEBUG_MODE) console.warn("[Shadowing] speak() lanzó excepción:", e);
+        fbFinish(false, "speak-threw");
+    }
 }
 
 // --- Renderers (un estado por fase) ---
@@ -1711,16 +1827,34 @@ async function playShadowingStep(sentence, index, total) {
     const display = document.getElementById("shadowing-display");
     if (!display) return;
 
+    if (DEBUG_MODE) {
+        console.log(`\n[Shadowing] ─── Frase ${index + 1}/${total} ───`);
+        console.log("[Shadowing] texto:", sentence);
+    }
+
     renderShadowingListen(display, sentence, index, total);
-    await playShadowingAudio(sentence, shadowingState.rate);
+
+    const t0 = performance.now();
+    const ok = await playShadowingAudio(sentence, shadowingState.rate);
+    if (DEBUG_MODE) {
+        console.log(
+            `[Shadowing] audio resuelto en ${Math.round(performance.now() - t0)} ms (ok=${ok})`,
+        );
+    }
+
     if (shadowingState.abort) return;
 
+    if (DEBUG_MODE) console.log("[Shadowing] entrando a fase REPEAT");
     await runShadowingRepeatPhase(sentence, index, total);
+    if (DEBUG_MODE) console.log("[Shadowing] fase REPEAT terminada");
 }
 
 // --- Entry points ---
 async function startShadowingRoutine() {
     if (shadowingState.running) return;
+
+     // ⬇️ NUEVO: desbloquea el audio en el mismo gesto del usuario
+    await unlockAudioPlayback();
 
     if (!currentUnit) {
         Swal.fire({
@@ -1770,11 +1904,17 @@ async function startShadowingRoutine() {
     if (stopBtn) stopBtn.classList.remove("hidden");
 
     try {
-        for (let i = 0; i < sentences.length; i++) {
-            if (shadowingState.abort) break;
-            shadowingState.index = i;
-            await playShadowingStep(sentences[i], i, sentences.length);
-        }
+        if (DEBUG_MODE) {
+        console.log(
+            `[Shadowing] ▶ iniciando rutina con ${sentences.length} frases a rate=${shadowingState.rate}, pauseMs=${shadowingState.pauseMs}`,
+        );
+    }
+    for (let i = 0; i < sentences.length; i++) {
+        if (shadowingState.abort) break;
+        shadowingState.index = i;
+        await playShadowingStep(sentences[i], i, sentences.length);
+    }
+    if (DEBUG_MODE) console.log("[Shadowing] ✔ bucle completado");
     } catch (e) {
         console.error("[Shadowing] error:", e);
     } finally {
