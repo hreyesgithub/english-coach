@@ -54,7 +54,8 @@ let shadowingState = {
     index: 0,
     pauseMs: 4000,
     rate: "-15%",
-    currentFinish: null, // para resolver la Promise de audio cuando se detiene manualmente
+    currentAudioFinish: null,
+    currentRepeatFinish: null,
 };
 
 let ptState = {
@@ -1255,11 +1256,41 @@ async function analyzeWriting(e) {
     }
 }
 
-// --- SHADOWING (v2: secuencia correcta, pausa adaptativa, controles) ---
+// ============================================================
+// SHADOWING v3 — Secuencia correcta + Grabación con feedback
+// ============================================================
 
-/**
- * Divide un texto en oraciones usando . ! ? como separadores.
- */
+// --- Estado de grabación (independiente del de Reading) ---
+let shadowingMediaStream = null;
+let shadowingRecorder = null;
+let shadowingChunks = [];
+let shadowingRecordingActive = false;
+let shadowingAutoStopTimer = null;
+let shadowingRecordingShouldEvaluate = true;
+
+// --- Helpers de media ---
+async function getShadowingMediaStream() {
+    if (shadowingMediaStream && shadowingMediaStream.active) {
+        return shadowingMediaStream;
+    }
+    shadowingMediaStream = await navigator.mediaDevices.getUserMedia({
+        audio: true,
+    });
+    return shadowingMediaStream;
+}
+
+function releaseShadowingMediaStream() {
+    if (shadowingMediaStream) {
+        try {
+            shadowingMediaStream.getTracks().forEach((t) => t.stop());
+        } catch (e) {
+            /* noop */
+        }
+        shadowingMediaStream = null;
+    }
+}
+
+// --- Utilidades de texto ---
 function splitIntoSentences(text) {
     if (!text) return [];
     const cleaned = text.replace(/\s+/g, " ").trim();
@@ -1268,9 +1299,7 @@ function splitIntoSentences(text) {
     return parts.map((s) => s.trim()).filter((s) => s.length > 0);
 }
 
-/**
- * Espera `ms` ms pero se cancela inmediatamente si `shadowingState.abort` es true.
- */
+// --- Timing ---
 function waitWithAbort(ms) {
     return new Promise((resolve) => {
         const start = Date.now();
@@ -1283,25 +1312,17 @@ function waitWithAbort(ms) {
     });
 }
 
-/**
- * Tiempo de repetición adaptado a la longitud de la frase.
- * Mínimo 3.5 s o ~700 ms por palabra (lo que sea mayor).
- */
 function computePauseMs(sentence) {
     const words = sentence.split(/\s+/).filter(Boolean).length;
     const basePause = Math.max(3500, words * 700);
     return Math.max(basePause, shadowingState.pauseMs);
 }
 
-/**
- * Reproduce un audio SIN mostrar SweetAlert de carga (específico para Shadowing).
- * Devuelve una Promise que se resuelve cuando termina o cuando se cancela.
- */
+// --- Audio (sin SweetAlert, espera al 'ended') ---
 function playShadowingAudio(text, rate = "-15%") {
     return new Promise((resolve) => {
         if (!text) return resolve(false);
 
-        // Detener cualquier audio previo
         stopCurrentAudio();
         processing.audio = true;
 
@@ -1316,85 +1337,388 @@ function playShadowingAudio(text, rate = "-15%") {
             if (resolved) return;
             resolved = true;
             if (currentAudioElement === audio) currentAudioElement = null;
-            if (shadowingState.currentFinish === finish) {
-                shadowingState.currentFinish = null;
+            if (shadowingState.currentAudioFinish === finish) {
+                shadowingState.currentAudioFinish = null;
             }
             processing.audio = false;
             resolve(ok);
         };
 
-        // Guardamos referencia para poder resolver la Promise desde stopShadowingRoutine
-        shadowingState.currentFinish = finish;
+        shadowingState.currentAudioFinish = finish;
 
         audio.onended = () => finish(true);
-
         audio.onerror = () => {
-            // Fallback al sintetizador del navegador
             window.speechSynthesis.cancel();
-            const utterance = new SpeechSynthesisUtterance(text);
-            utterance.lang = "en-US";
-            utterance.rate = 0.85;
-            utterance.onend = () => finish(true);
-            utterance.onerror = () => finish(false);
-            window.speechSynthesis.speak(utterance);
+            const u = new SpeechSynthesisUtterance(text);
+            u.lang = "en-US";
+            u.rate = 0.85;
+            u.onend = () => finish(true);
+            u.onerror = () => finish(false);
+            window.speechSynthesis.speak(u);
         };
-
         audio.play().catch(() => {
             window.speechSynthesis.cancel();
-            const utterance = new SpeechSynthesisUtterance(text);
-            utterance.lang = "en-US";
-            utterance.rate = 0.85;
-            utterance.onend = () => finish(true);
-            utterance.onerror = () => finish(false);
-            window.speechSynthesis.speak(utterance);
+            const u = new SpeechSynthesisUtterance(text);
+            u.lang = "en-US";
+            u.rate = 0.85;
+            u.onend = () => finish(true);
+            u.onerror = () => finish(false);
+            window.speechSynthesis.speak(u);
         });
     });
 }
 
-/**
- * Pinta en pantalla la frase actual + el estado (escuchando / repite).
- */
-function renderShadowingStep(sentence, index, total, phase) {
-    const display = document.getElementById("shadowing-display");
-    if (!display) return;
+// --- Renderers (un estado por fase) ---
+function shadowingProgressBar(index, total) {
+    const pct = ((index + 1) / total) * 100;
+    return `
+        <div class="mt-4 w-full bg-slate-200 dark:bg-slate-700 h-1.5 rounded-full overflow-hidden">
+            <div class="bg-indigo-600 h-1.5 transition-all duration-300"
+                 style="width: ${pct}%"></div>
+        </div>`;
+}
 
-    const phaseLabel =
-        phase === "listen"
-            ? '<span class="text-xs font-bold text-indigo-600 dark:text-indigo-400 uppercase tracking-wider flex items-center gap-1"><span class="material-symbols-outlined text-[14px]">volume_up</span> Escuchando…</span>'
-            : '<span class="text-xs font-bold text-emerald-600 dark:text-emerald-400 uppercase tracking-wider flex items-center gap-1"><span class="material-symbols-outlined text-[14px]">mic</span> Repite ahora</span>';
-
-    const hint =
-        phase === "listen"
-            ? "Escucha con atención la entonación y el ritmo."
-            : "Repite la frase en voz alta imitando al hablante.";
-
-    display.innerHTML = `
-        <div class="flex items-center justify-between mb-3">
+function shadowingHeader(index, total, phaseBadge) {
+    return `
+        <div class="flex items-center justify-between mb-3 flex-wrap gap-2">
             <span class="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
                 Frase ${index + 1} de ${total}
             </span>
-            ${phaseLabel}
-        </div>
+            ${phaseBadge}
+        </div>`;
+}
+
+function renderShadowingListen(display, sentence, index, total) {
+    const badge = `
+        <span class="text-xs font-bold text-indigo-600 dark:text-indigo-400 uppercase tracking-wider flex items-center gap-1">
+            <span class="material-symbols-outlined text-[14px]">volume_up</span> Escuchando…
+        </span>`;
+    display.innerHTML = `
+        ${shadowingHeader(index, total, badge)}
         <p class="text-lg font-medium text-slate-800 dark:text-slate-100 mb-2">${escapeHtml(sentence)}</p>
-        <p class="text-sm text-slate-500 dark:text-slate-400 italic">${hint}</p>
-        <div class="mt-3 w-full bg-slate-200 dark:bg-slate-700 h-1.5 rounded-full overflow-hidden">
-            <div class="bg-indigo-600 h-1.5 transition-all duration-300"
-                 style="width: ${((index + 1) / total) * 100}%"></div>
-        </div>
+        <p class="text-sm text-slate-500 dark:text-slate-400 italic">Escucha con atención la entonación y el ritmo.</p>
+        ${shadowingProgressBar(index, total)}
     `;
 }
 
-/**
- * Reproduce UNA frase completa y espera a que el alumno la repita.
- */
-async function playShadowingStep(sentence, index, total) {
-    renderShadowingStep(sentence, index, total, "listen");
-    await playShadowingAudio(sentence, shadowingState.rate);
-    if (shadowingState.abort) return;
-    renderShadowingStep(sentence, index, total, "repeat");
-    await waitWithAbort(computePauseMs(sentence));
+function renderShadowingRepeat(display, sentence, index, total, handlers) {
+    const badge = `
+        <span class="text-xs font-bold text-emerald-600 dark:text-emerald-400 uppercase tracking-wider flex items-center gap-1">
+            <span class="material-symbols-outlined text-[14px]">mic</span> Repite ahora
+        </span>`;
+    display.innerHTML = `
+        ${shadowingHeader(index, total, badge)}
+        <p class="text-lg font-medium text-slate-800 dark:text-slate-100 mb-2">${escapeHtml(sentence)}</p>
+        <p class="text-sm text-slate-500 dark:text-slate-400 italic mb-4">
+            Repite la frase en voz alta. Opcionalmente graba tu repetición para recibir feedback.
+        </p>
+        <div class="flex flex-wrap gap-2">
+            <button type="button" id="sh-record-btn"
+                    class="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2.5 rounded-lg font-bold shadow-sm transition flex items-center gap-2">
+                <span class="material-symbols-outlined text-[18px]">mic</span> Grabar mi repetición
+            </button>
+            <button type="button" id="sh-skip-btn"
+                    class="bg-slate-200 dark:bg-slate-700 hover:bg-slate-300 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-200 px-4 py-2.5 rounded-lg font-semibold transition flex items-center gap-2">
+                <span class="material-symbols-outlined text-[18px]">skip_next</span> Saltar
+            </button>
+        </div>
+        ${shadowingProgressBar(index, total)}
+    `;
+
+    const recBtn = document.getElementById("sh-record-btn");
+    const skipBtn = document.getElementById("sh-skip-btn");
+    if (recBtn) recBtn.onclick = () => handlers.onRecord && handlers.onRecord();
+    if (skipBtn) skipBtn.onclick = () => handlers.onSkip && handlers.onSkip();
 }
 
+function renderShadowingRecording(display, sentence, index, total) {
+    const badge = `
+        <span class="text-xs font-bold text-rose-600 dark:text-rose-400 uppercase tracking-wider flex items-center gap-1 animate-pulse">
+            <span class="material-symbols-outlined text-[14px]">radio_button_checked</span> Grabando…
+        </span>`;
+    display.innerHTML = `
+        ${shadowingHeader(index, total, badge)}
+        <p class="text-lg font-medium text-slate-800 dark:text-slate-100 mb-2">${escapeHtml(sentence)}</p>
+        <p class="text-sm text-slate-600 dark:text-slate-300 italic mb-4">
+            ¡Habla ahora! Di la frase con la misma entonación que escuchaste.
+        </p>
+        <button type="button" id="sh-stop-record-btn"
+                class="bg-rose-600 hover:bg-rose-700 text-white px-5 py-2.5 rounded-lg font-bold shadow-sm transition flex items-center gap-2">
+            <span class="material-symbols-outlined text-[18px]">stop_circle</span> Detener y evaluar
+        </button>
+        ${shadowingProgressBar(index, total)}
+    `;
+    const stopBtn = document.getElementById("sh-stop-record-btn");
+    if (stopBtn) {
+        stopBtn.onclick = () => stopShadowingRecording(true);
+    }
+}
+
+function renderShadowingEvaluating(display, sentence, index, total) {
+    const badge = `
+        <span class="text-xs font-bold text-indigo-600 dark:text-indigo-400 uppercase tracking-wider flex items-center gap-1">
+            <span class="material-symbols-outlined text-[14px] animate-spin">progress_activity</span> Evaluando…
+        </span>`;
+    display.innerHTML = `
+        ${shadowingHeader(index, total, badge)}
+        <p class="text-lg font-medium text-slate-800 dark:text-slate-100 mb-2">${escapeHtml(sentence)}</p>
+        <p class="text-sm text-slate-500 dark:text-slate-400 italic">
+            Enviando tu grabación al servidor para analizar tu pronunciación...
+        </p>
+        ${shadowingProgressBar(index, total)}
+    `;
+}
+
+function renderShadowingFeedback(display, sentence, index, total, data, handlers) {
+    const score = Number(data.accuracy_score) || 0;
+
+    // Color y mensaje según la puntuación
+    let colorClasses, iconName, headline;
+    if (score >= 85) {
+        colorClasses =
+            "bg-emerald-50 dark:bg-emerald-950/40 border-emerald-200 dark:border-emerald-800 text-emerald-900 dark:text-emerald-200";
+        iconName = "check_circle";
+        headline = "¡Excelente! Pronunciación muy precisa.";
+    } else if (score >= 70) {
+        colorClasses =
+            "bg-lime-50 dark:bg-lime-950/40 border-lime-200 dark:border-lime-800 text-lime-900 dark:text-lime-200";
+        iconName = "thumb_up";
+        headline = "¡Bien! Vas por buen camino.";
+    } else if (score >= 50) {
+        colorClasses =
+            "bg-amber-50 dark:bg-amber-950/40 border-amber-200 dark:border-amber-800 text-amber-900 dark:text-amber-200";
+        iconName = "info";
+        headline = "Casi. Intenta articular con más claridad.";
+    } else {
+        colorClasses =
+            "bg-rose-50 dark:bg-rose-950/40 border-rose-200 dark:border-rose-800 text-rose-900 dark:text-rose-200";
+        iconName = "error";
+        headline = "Difícil de reconocer. Repite la frase más despacio.";
+    }
+
+    const badge = `
+        <span class="text-xs font-bold ${score >= 70 ? "text-emerald-600 dark:text-emerald-400" : "text-amber-600 dark:text-amber-400"} uppercase tracking-wider flex items-center gap-1">
+            <span class="material-symbols-outlined text-[14px]">${iconName}</span> Resultado
+        </span>`;
+
+    // Análisis palabra por palabra
+    const wordsHtml = (data.word_analysis || [])
+        .map((item) => {
+            const safeWord = escapeHtml(item.word);
+            if (item.status === "correct") {
+                return `<span class="inline-block text-emerald-600 dark:text-emerald-400 font-bold mr-1.5">${safeWord}</span>`;
+            }
+            return `<span class="inline-flex flex-col items-center bg-rose-50 dark:bg-rose-950/60 px-2 py-0.5 rounded border border-rose-200 dark:border-rose-800/60 cursor-pointer mx-0.5 my-0.5 hover:bg-rose-100 dark:hover:bg-rose-900/60 transition"
+                         data-action="play-audio"
+                         data-text="${escapeAttr(item.word)}"
+                         title="Escuchar pronunciación correcta">
+                        <span class="text-rose-700 dark:text-rose-300 font-bold text-sm">${safeWord}</span>
+                        <span class="text-[10px] text-slate-600 dark:text-slate-400 font-mono">${escapeHtml(item.ipa || "")}</span>
+                    </span>`;
+        })
+        .join(" ");
+
+    display.innerHTML = `
+        ${shadowingHeader(index, total, badge)}
+        <div class="p-4 rounded-xl border ${colorClasses} mb-4">
+            <div class="flex items-center gap-3 mb-2">
+                <span class="material-symbols-outlined text-3xl">${iconName}</span>
+                <div class="flex-1">
+                    <p class="font-bold leading-tight">${headline}</p>
+                    <p class="text-xs opacity-80 mt-0.5">Precisión: <strong>${score}%</strong></p>
+                </div>
+            </div>
+            <div class="bg-white/60 dark:bg-slate-900/40 p-3 rounded-lg text-base leading-relaxed">
+                ${wordsHtml}
+            </div>
+        </div>
+        <div class="flex flex-wrap gap-2">
+            <button type="button" id="sh-retry-btn"
+                    class="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2.5 rounded-lg font-bold shadow-sm transition flex items-center gap-2">
+                <span class="material-symbols-outlined text-[18px]">refresh</span> Repetir esta frase
+            </button>
+            <button type="button" id="sh-next-btn"
+                    class="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2.5 rounded-lg font-bold shadow-sm transition flex items-center gap-2">
+                <span class="material-symbols-outlined text-[18px]">arrow_forward</span> Siguiente frase
+            </button>
+        </div>
+        ${shadowingProgressBar(index, total)}
+    `;
+
+    const retryBtn = document.getElementById("sh-retry-btn");
+    const nextBtn = document.getElementById("sh-next-btn");
+    if (retryBtn) retryBtn.onclick = () => handlers.onRetry && handlers.onRetry();
+    if (nextBtn) nextBtn.onclick = () => handlers.onNext && handlers.onNext();
+}
+
+// --- Grabación + evaluación ---
+async function recordAndEvaluate(sentence, index, total) {
+    const display = document.getElementById("shadowing-display");
+    if (display) renderShadowingRecording(display, sentence, index, total);
+
+    const stream = await getShadowingMediaStream();
+    shadowingChunks = [];
+    shadowingRecordingShouldEvaluate = true;
+
+    return new Promise((resolve, reject) => {
+        try {
+            shadowingRecorder = new MediaRecorder(stream);
+        } catch (e) {
+            return reject(e);
+        }
+
+        shadowingRecorder.ondataavailable = (e) => {
+            if (e.data.size > 0) shadowingChunks.push(e.data);
+        };
+
+        shadowingRecorder.onstop = async () => {
+            if (!shadowingRecordingShouldEvaluate || shadowingState.abort) {
+                return reject(new Error("Recorrido cancelado"));
+            }
+            if (shadowingChunks.length === 0) {
+                return reject(new Error("No se capturó audio"));
+            }
+
+            const blob = new Blob(shadowingChunks, { type: "audio/wav" });
+            const formData = new FormData();
+            formData.append("audio_file", blob, "shadowing.wav");
+            formData.append("target_text", sentence);
+
+            if (display) renderShadowingEvaluating(display, sentence, index, total);
+
+            try {
+                const res = await apiFetch("/api/evaluate-reading", {
+                    method: "POST",
+                    headers: { Authorization: `Bearer ${authToken}` },
+                    body: formData,
+                });
+                if (!res.ok) throw new Error(`HTTP ${res.status}`);
+                const data = await res.json();
+                resolve(data);
+            } catch (err) {
+                reject(err);
+            }
+        };
+
+        shadowingRecorder.onerror = (e) =>
+            reject(e.error || new Error("Error del MediaRecorder"));
+
+        shadowingRecorder.start();
+        shadowingRecordingActive = true;
+
+        // Auto-stop a los 10 s por si el usuario no detiene manualmente
+        shadowingAutoStopTimer = setTimeout(() => {
+            if (shadowingRecordingActive) stopShadowingRecording(true);
+        }, 10000);
+    });
+}
+
+function stopShadowingRecording(shouldEvaluate = true) {
+    if (shadowingAutoStopTimer) {
+        clearTimeout(shadowingAutoStopTimer);
+        shadowingAutoStopTimer = null;
+    }
+    if (shadowingRecorder && shadowingRecordingActive) {
+        shadowingRecordingShouldEvaluate = shouldEvaluate;
+        try {
+            shadowingRecorder.stop();
+        } catch (e) {
+            /* noop */
+        }
+        shadowingRecordingActive = false;
+    }
+}
+
+// --- Fase de repetición interactiva (con grabación opcional) ---
+function runShadowingRepeatPhase(sentence, index, total) {
+    return new Promise((resolve) => {
+        const display = document.getElementById("shadowing-display");
+        if (!display) return resolve();
+
+        let settled = false;
+        let autoAdvanceTimer = null;
+        let abortPollId = null;
+
+        const finish = () => {
+            if (settled) return;
+            settled = true;
+            if (autoAdvanceTimer) clearTimeout(autoAdvanceTimer);
+            if (abortPollId) clearInterval(abortPollId);
+            shadowingState.currentRepeatFinish = null;
+            resolve();
+        };
+
+        shadowingState.currentRepeatFinish = finish;
+
+        // Vigila el abort global para resolver la promesa si el usuario pulsa "Detener"
+        abortPollId = setInterval(() => {
+            if (shadowingState.abort) finish();
+        }, 150);
+
+        const showRepeat = () => {
+            if (shadowingState.abort || settled) return;
+
+            renderShadowingRepeat(display, sentence, index, total, {
+                onRecord: async () => {
+                    if (autoAdvanceTimer) {
+                        clearTimeout(autoAdvanceTimer);
+                        autoAdvanceTimer = null;
+                    }
+                    try {
+                        const data = await recordAndEvaluate(sentence, index, total);
+                        if (shadowingState.abort || settled) return;
+                        showFeedback(data);
+                    } catch (err) {
+                        console.error("[Shadowing] Error al grabar/evaluar:", err);
+                        if (shadowingState.abort || settled) return;
+                        // Recuperación: volver a mostrar el estado de repetición
+                        showRepeat();
+                    }
+                },
+                onSkip: () => finish(),
+            });
+
+            autoAdvanceTimer = setTimeout(
+                () => finish(),
+                computePauseMs(sentence),
+            );
+        };
+
+        const showFeedback = (data) => {
+            if (shadowingState.abort || settled) return;
+
+            renderShadowingFeedback(display, sentence, index, total, data, {
+                onRetry: () => {
+                    if (autoAdvanceTimer) {
+                        clearTimeout(autoAdvanceTimer);
+                        autoAdvanceTimer = null;
+                    }
+                    showRepeat();
+                },
+                onNext: () => finish(),
+            });
+
+            // Auto-advance tras 12 s de inactividad en el panel de feedback
+            autoAdvanceTimer = setTimeout(() => finish(), 12000);
+        };
+
+        showRepeat();
+    });
+}
+
+// --- Loop principal de una frase ---
+async function playShadowingStep(sentence, index, total) {
+    const display = document.getElementById("shadowing-display");
+    if (!display) return;
+
+    renderShadowingListen(display, sentence, index, total);
+    await playShadowingAudio(sentence, shadowingState.rate);
+    if (shadowingState.abort) return;
+
+    await runShadowingRepeatPhase(sentence, index, total);
+}
+
+// --- Entry points ---
 async function startShadowingRoutine() {
     if (shadowingState.running) return;
 
@@ -1419,7 +1743,6 @@ async function startShadowingRoutine() {
         return;
     }
 
-    // Leer controles del usuario
     const speedSelect = document.getElementById("shadowing-speed");
     const pauseSelect = document.getElementById("shadowing-pause");
 
@@ -1430,7 +1753,8 @@ async function startShadowingRoutine() {
         index: 0,
         rate: speedSelect ? speedSelect.value : "-15%",
         pauseMs: pauseSelect ? parseInt(pauseSelect.value, 10) : 4000,
-        currentFinish: null,
+        currentAudioFinish: null,
+        currentRepeatFinish: null,
     };
     processing.shadowing = true;
 
@@ -1457,9 +1781,14 @@ async function startShadowingRoutine() {
         const aborted = shadowingState.abort;
         const totalSentences = shadowingState.sentences.length;
 
+        // Limpieza total
+        stopShadowingRecording(false);
+        releaseShadowingMediaStream();
+
         shadowingState.running = false;
         shadowingState.abort = false;
-        shadowingState.currentFinish = null;
+        shadowingState.currentAudioFinish = null;
+        shadowingState.currentRepeatFinish = null;
         processing.shadowing = false;
 
         if (btn) {
@@ -1497,16 +1826,30 @@ function stopShadowingRoutine() {
     if (!shadowingState.running) return;
     shadowingState.abort = true;
 
-    // Resolver la Promise de audio pendiente para desbloquear el bucle for
-    if (shadowingState.currentFinish) {
+    // Resolver la Promise del audio en curso (si la hay)
+    if (shadowingState.currentAudioFinish) {
         try {
-            shadowingState.currentFinish(false);
+            shadowingState.currentAudioFinish(false);
         } catch (e) {
             /* noop */
         }
-        shadowingState.currentFinish = null;
+        shadowingState.currentAudioFinish = null;
     }
 
+    // Detener la grabación en curso SIN evaluar
+    stopShadowingRecording(false);
+
+    // Resolver la fase de repetición si está pendiente
+    if (shadowingState.currentRepeatFinish) {
+        try {
+            shadowingState.currentRepeatFinish();
+        } catch (e) {
+            /* noop */
+        }
+        shadowingState.currentRepeatFinish = null;
+    }
+
+    // Parar cualquier audio en reproducción
     stopCurrentAudio();
 }
 
