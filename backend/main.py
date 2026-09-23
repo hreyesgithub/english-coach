@@ -146,7 +146,7 @@ LEVEL_ORDER = ["A1", "A2", "B1", "B2", "C1", "C2"]
 MAX_TEXT_LEN = 500  # límite defensivo para endpoints de texto libre
 
 
-def seed_srs_from_curriculum():
+def seed_srs_from_curriculum_old():
     """Sincroniza el vocabulario del currículo directamente en Supabase."""
     if not supabase:
         return
@@ -182,6 +182,70 @@ def seed_srs_from_curriculum():
         except Exception as e:
             logger.error(f"Error al sembrar vocabulario en Supabase: {e}")
 
+def ensure_user_srs_seeded(user_id: str) -> None:
+    """
+    Garantiza que el usuario tenga su banco SRS sembrado con el vocabulario
+    del currículo. Se ejecuta de forma perezosa la primera vez que el usuario
+    interactúa con el módulo SRS. Si ya tiene palabras, no hace nada.
+    """
+    if not supabase:
+        return
+
+    try:
+        res = (
+            supabase.table("srs_words")
+            .select("id")
+            .eq("user_id", user_id)
+            .limit(1)
+            .execute()
+        )
+        if res.data:
+            return  # Ya está sembrado
+    except Exception as e:
+        logger.error(f"Error comprobando seed SRS para {user_id}: {e}")
+        return
+
+    today_str = datetime.now().date().isoformat()
+    words_to_upsert = []
+
+    for level_data in CURRICULUM.values():
+        for unit in level_data.get("units", []):
+            for raw_word in unit.get("vocabulary", []):
+                clean_word = raw_word.strip().lower()
+                if not clean_word:
+                    continue
+                try:
+                    ipa_transcription = f"/{ipa.convert(clean_word)}/"
+                except Exception:
+                    ipa_transcription = ""
+
+                words_to_upsert.append(
+                    {
+                        "user_id": user_id,
+                        "word": clean_word,
+                        "ipa": ipa_transcription,
+                        "level": 1,
+                        "next_review": today_str,
+                        "times_failed": 0,
+                        "times_passed": 0,
+                    }
+                )
+
+    if not words_to_upsert:
+        return
+
+    try:
+        # on_conflict apunta ahora a la restricción compuesta (user_id, word)
+        supabase.table("srs_words").upsert(
+            words_to_upsert,
+            on_conflict="user_id,word",
+            ignore_duplicates=True,
+        ).execute()
+        logger.info(
+            f"Seed SRS para {user_id}: {len(words_to_upsert)} palabras insertadas."
+        )
+    except Exception as e:
+        logger.error(f"Error al sembrar SRS para {user_id}: {e}")
 
 # --- MODELOS PYDANTIC ---
 class PronunciationEvaluationRequest(BaseModel):
@@ -499,13 +563,31 @@ def calculate_final_level(history):
 
 
 # --- STARTUP: siembra diferida y protegida ---
-@app.on_event("startup")
-async def startup_event():
-    try:
-        seed_srs_from_curriculum()
-    except Exception as e:
-        logger.error(f"Fallo al sembrar SRS en el arranque: {e}")
 
+@app.get("/api/srs/due-words")
+def get_due_words(user_id: str = Depends(get_current_user)):
+    if not supabase:
+        return {"due_words": [], "count": 0}
+
+    ensure_user_srs_seeded(user_id)   # ⬅️ NUEVO
+
+    today_str = datetime.now().date().isoformat()
+    try:
+        res = (
+            supabase.table("srs_words")
+            .select("id, word, ipa, level, times_failed, times_passed")
+            .eq("user_id", user_id)                      # ⬅️ NUEVO
+            .lte("next_review", today_str)
+            .order("level", desc=False)
+            .order("times_failed", desc=True)
+            .execute()
+        )
+    except Exception as e:
+        logger.error(f"Error Supabase (due-words): {e}")
+        raise HTTPException(
+            status_code=503, detail="Servicio de base de datos no disponible."
+        )
+    return {"due_words": res.data, "count": len(res.data)}
 
 # --- ENDPOINTS GENERALES ---
 @app.get("/")
@@ -624,29 +706,6 @@ def evaluate_pronunciation(data: PronunciationEvaluationRequest):
     }
 
 
-# --- ENDPOINTS DEL SISTEMA SRS (SUPABASE) — requieren usuario autenticado ---
-@app.get("/api/srs/due-words")
-def get_due_words(user_id: str = Depends(get_current_user)):
-    if not supabase:
-        return {"due_words": [], "count": 0}
-    today_str = datetime.now().date().isoformat()
-    try:
-        res = (
-            supabase.table("srs_words")
-            .select("id, word, ipa, level, times_failed, times_passed")
-            .lte("next_review", today_str)
-            .order("level", desc=False)
-            .order("times_failed", desc=True)
-            .execute()
-        )
-    except Exception as e:
-        logger.error(f"Error Supabase (due-words): {e}")
-        raise HTTPException(
-            status_code=503, detail="Servicio de base de datos no disponible."
-        )
-    return {"due_words": res.data, "count": len(res.data)}
-
-
 @app.post("/api/srs/review")
 def review_srs_word(data: SRSReviewRequest, user_id: str = Depends(get_current_user)):
     if not supabase:
@@ -658,6 +717,7 @@ def review_srs_word(data: SRSReviewRequest, user_id: str = Depends(get_current_u
         res = (
             supabase.table("srs_words")
             .select("level, times_passed, times_failed")
+            .eq("user_id", user_id)         # ⬅️ NUEVO
             .eq("word", word)
             .execute()
         )
@@ -691,7 +751,7 @@ def review_srs_word(data: SRSReviewRequest, user_id: str = Depends(get_current_u
                     "next_review": next_review,
                     "times_passed": int(row.get("times_passed", 0) or 0) + 1,
                 }
-            ).eq("word", word).execute()
+            ).eq("user_id", user_id).eq("word", word).execute()   # ⬅️ doble filtro
         else:
             new_level = 1
             next_review = today.isoformat()
@@ -701,7 +761,7 @@ def review_srs_word(data: SRSReviewRequest, user_id: str = Depends(get_current_u
                     "next_review": next_review,
                     "times_failed": int(row.get("times_failed", 0) or 0) + 1,
                 }
-            ).eq("word", word).execute()
+            ).eq("user_id", user_id).eq("word", word).execute()   # ⬅️ doble filtro
     except Exception as e:
         logger.error(f"Error Supabase (review update): {e}")
         raise HTTPException(status_code=503, detail="No se pudo actualizar la palabra.")
@@ -712,7 +772,6 @@ def review_srs_word(data: SRSReviewRequest, user_id: str = Depends(get_current_u
         "next_review": str(next_review),
         "status": "promoted" if data.success else "reset",
     }
-
 
 @app.get("/api/srs/stats")
 def get_srs_stats(authorization: Optional[str] = Header(None)):
@@ -1165,45 +1224,50 @@ async def evaluate_reading(
             )
             failed_words.append(tw)
 
-    if failed_words and supabase:
-        today_str = date.today().isoformat()
-        try:
-            for fw in failed_words:
-                clean_fw = fw.strip().lower()
-                existing = (
-                    supabase.table("srs_words")
-                    .select("times_failed")
-                    .eq("word", clean_fw)
-                    .execute()
-                )
-                if existing.data:
-                    existing_word = existing.data[0]
-                    previous_failures = (
-                        existing_word.get("times_failed", 0)
-                        if isinstance(existing_word, dict)
-                        else 0
+        if failed_words and supabase:
+            today_str = date.today().isoformat()
+            try:
+                for fw in failed_words:
+                    clean_fw = fw.strip().lower()
+
+                    existing = (
+                        supabase.table("srs_words")
+                        .select("times_failed")
+                        .eq("user_id", user_id)          # ⬅️ NUEVO
+                        .eq("word", clean_fw)
+                        .execute()
                     )
-                    tf = (
-                        previous_failures + 1
-                        if isinstance(previous_failures, int)
-                        and not isinstance(previous_failures, bool)
-                        else 1
-                    )
-                    supabase.table("srs_words").update(
-                        {"level": 1, "next_review": today_str, "times_failed": tf}
-                    ).eq("word", clean_fw).execute()
-                else:
-                    supabase.table("srs_words").insert(
-                        {
-                            "word": clean_fw,
-                            "ipa": f"/{ipa.convert(clean_fw)}/",
-                            "level": 1,
-                            "next_review": today_str,
-                            "times_failed": 1,
-                        }
-                    ).execute()
-        except Exception as e:
-            logger.error(f"Error Supabase (evaluate-reading srs update): {e}")
+
+                    if existing.data:
+                        existing_word = existing.data[0]
+                        previous_failures = (
+                            existing_word.get("times_failed", 0)
+                            if isinstance(existing_word, dict)
+                            else 0
+                        )
+                        tf = (
+                            previous_failures + 1
+                            if isinstance(previous_failures, int)
+                            and not isinstance(previous_failures, bool)
+                            else 1
+                        )
+                        supabase.table("srs_words").update(
+                            {"level": 1, "next_review": today_str, "times_failed": tf}
+                        ).eq("user_id", user_id).eq("word", clean_fw).execute()   # ⬅️ doble filtro
+                    else:
+                        supabase.table("srs_words").insert(
+                            {
+                                "user_id": user_id,      # ⬅️ NUEVO
+                                "word": clean_fw,
+                                "ipa": f"/{ipa.convert(clean_fw)}/",
+                                "level": 1,
+                                "next_review": today_str,
+                                "times_failed": 1,
+                                "times_passed": 0,
+                            }
+                        ).execute()
+            except Exception as e:
+                logger.error(f"Error Supabase (evaluate-reading srs update): {e}")
 
     update_daily_progress(user_id=user_id, words=len(target_words) - len(failed_words))
 
