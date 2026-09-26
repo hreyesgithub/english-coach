@@ -595,7 +595,7 @@ def read_root():
     return {"message": "¡Bienvenido al backend del Coach de Inglés!"}
 
 
-@app.get("/health", tags=["System"])
+@app.api_route("/health", tags=["System"], methods=["GET", "HEAD"])
 def health_check():
     """Endpoint de verificación de salud para Render y monitoreo externo."""
     return {
